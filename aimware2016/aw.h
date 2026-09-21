@@ -13,11 +13,20 @@
 #include <memory>
 #include <functional>
 
-// Core includes
+// Core includes - advanced mapping system
 #include "core/logger.hpp"
 #include "core/sdk.hpp"
 #include "core/memory_manager.hpp"
 #include "core/config_system.hpp"
+#include "core/pe_parser.hpp"
+#include "core/decryptor.hpp"
+#include "core/advanced_mapper.hpp"
+
+// Full reverse engineering docs
+#include "reversed/memory_map.hpp"
+#include "reversed/config_struct.hpp"
+#include "reversed/offsets.hpp"
+#include "reversed/functions.hpp"
 
 // Binary dumps
 #include "b7C4A0000.h"
@@ -33,8 +42,9 @@
 #include "netvars_manager.hpp"
 #include "util.hpp"
 
-// Feature toggle
+// Feature toggles
 #define USE_DECOMPILED_ENGINE
+#define USE_ADVANCED_MAPPER
 
 // Compatibility
 using namespace Aimware;
@@ -65,7 +75,7 @@ struct AwSkinChangerData {
     void* sequence_proxy;
 };
 
-// Global context holder
+// Enhanced global context with full reverse info
 struct GlobalState {
     // Render & Globals
     AwRender* render = nullptr;
@@ -107,8 +117,16 @@ struct GlobalState {
     NetvarManager netvars;
     std::vector<std::pair<uintptr_t, uintptr_t>> hooked_netvars;
 
+    // Advanced mapper
+    Mapping::AdvancedMapper* mapper = nullptr;
+
+    // Decryption
+    int profileXorKey = 0;
+    std::vector<Crypto::StringDecryptor::EncryptedString> decryptedStrings;
+
     bool initialized = false;
     bool panic = false;
+    bool useAdvancedMapper = true;
 
     static GlobalState& Instance() {
         static GlobalState state;
@@ -126,6 +144,9 @@ struct GlobalState {
         view_render_hook.reset();
         fire_bullets_hook.reset();
         hooked_netvars.clear();
+        if (mapper) {
+            mapper->UnmapAll();
+        }
         initialized = false;
     }
 };
@@ -134,6 +155,7 @@ struct GlobalState {
 namespace Aimware {
 
 bool InitializeMemoryDumps();
+bool InitializeMemoryDumpsAdvanced();
 bool InitializeInterfaces();
 bool InitializeNetvars();
 bool InitializeHooks();
@@ -143,8 +165,13 @@ void HookNetvar(const char* table, const char* var, uintptr_t original_addr, uin
 void UnhookNetvars();
 
 void FixImports();
+void FixImportsAdvanced();
 void FixAddresses();
 void FixConvars();
 void FixPostOEP();
+void FixXorPatches();
+
+bool DecryptStringSection();
+void AnalyzeDumps();
 
 } // namespace Aimware

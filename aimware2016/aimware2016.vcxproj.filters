@@ -12,6 +12,9 @@
     <Filter Include="Headers\Core">
       <UniqueIdentifier>{A1B2C3D4-E5F6-7890-1234-56789ABCDEF1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Headers\Reversed">
+      <UniqueIdentifier>{C3D4E5F6-A7B8-9012-3456-789ABCDEF012}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Decompiled">
       <UniqueIdentifier>{D1E2F3A4-B5C6-7890-1234-56789ABCDEF0}</UniqueIdentifier>
     </Filter>
@@ -90,6 +93,27 @@
     </ClInclude>
     <ClInclude Include="core\config_system.hpp">
       <Filter>Headers\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\pe_parser.hpp">
+      <Filter>Headers\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\decryptor.hpp">
+      <Filter>Headers\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\advanced_mapper.hpp">
+      <Filter>Headers\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="reversed\memory_map.hpp">
+      <Filter>Headers\Reversed</Filter>
+    </ClInclude>
+    <ClInclude Include="reversed\config_struct.hpp">
+      <Filter>Headers\Reversed</Filter>
+    </ClInclude>
+    <ClInclude Include="reversed\offsets.hpp">
+      <Filter>Headers\Reversed</Filter>
+    </ClInclude>
+    <ClInclude Include="reversed\functions.hpp">
+      <Filter>Headers\Reversed</Filter>
     </ClInclude>
     <ClInclude Include="decompiled\decompiled_sdk.hpp">
       <Filter>Decompiled</Filter>
