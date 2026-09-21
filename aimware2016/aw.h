@@ -12,6 +12,10 @@
 #include "b76ED0000.h"
 #include "b43AF0000.h"
 #include "b34E10000.h"
+#include "decompiled/aimware_decompiled.hpp"
+
+// Toggle between raw binary dump hooks (false) and decompiled C++ engine hooks (true)
+#define USE_DECOMPILED_ENGINE
 
 struct AwRender
 {

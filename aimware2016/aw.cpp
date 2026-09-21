@@ -635,6 +635,31 @@ void init_aw_hooks()
 	*(WNDPROC*)(0x43AFF104) = orig_wndproc;
 	*(HWND*)(0x43AFF214) = window;
 
+#ifdef USE_DECOMPILED_ENGINE
+	// Bridge hooks using decompiled C++ engine subroutines
+	*(PDWORD)0x43AFE63C = engine_vgui_hook->hook_function((DWORD)&Aimware2016Decompiled::VisualsEngine::hkEngineVGUIPaint, 14); // EngineVGUI::Paint
+	*(PDWORD)0x43AFE630 = client_hook->hook_function(0x34E26330, 36); // CHLClient::FrameStageNotify original
+	*(PDWORD)0x43AFE178 = client_mode_hook->hook_function((DWORD)&Aimware2016Decompiled::AimbotEngine::hkCreateMove, 24); // ClientMode::CreateMove
+	*(PDWORD)0x43AFEE54 = prediction_hook->hook_function(0x34E314B0, 19); // Prediction::RunCommand original
+	*(PDWORD)0x43AFE644 = prediction_hook->hook_function(0x34E26880, 20); // Prediction::SetupMove original
+
+	*(PDWORD)0x43AFE634 = surface_hook->hook_function((DWORD)&Aimware2016Decompiled::VisualsEngine::hkLockCursor, 67); // Surface::LockCursor
+	*(PDWORD)0x43AFE17C = studio_render_hook->hook_function((DWORD)&Aimware2016Decompiled::VisualsEngine::hkDrawModel, 29); // StudioRender::DrawModel
+
+	client_hook->hook_function(0x34E268C0, 23); // CHLClient::WriteUserCmdDeltaToBuffer
+	prediction_hook->hook_function(0x34E26500, 14); // Prediction::InPrediction
+
+	*(PDWORD)0x43AFE0E8 = (DWORD)DetourFunction((PBYTE)find_signature("client.dll", "55 8B EC 83 EC ? 56 8B F1 57 89 75 ? E8 ? ? ? ? 8B CE E8"), (PBYTE)&Aimware2016Decompiled::ResolverEngine::hkOnRenderStart);
+
+	hook_netvar("CSmokeGrenadeProjectile", "m_nSmokeEffectTickBegin", 0x43B01328, 0x34E24BC0);
+
+	hook_netvar("CCSPlayer", "m_angEyeAngles[0]", 0, (uintptr_t)&Aimware2016Decompiled::ResolverEngine::OnPitchProxy);
+	hook_netvar("CCSPlayer", "m_angEyeAngles[1]", 0, (uintptr_t)&Aimware2016Decompiled::ResolverEngine::OnYawProxy);
+	hook_netvar("CCSPlayer", "m_flThirdpersonRecoil", 0x43B01304, 0x34E24FC0);
+	hook_netvar("CCSPlayer", "m_flLowerBodyYawTarget", 0x43B01334, (uintptr_t)&Aimware2016Decompiled::ResolverEngine::OnLBYProxy);
+	hook_netvar("CBasePlayer", "m_fFlags", 0x43B01340, 0x34E24F40);
+	hook_netvar("CCSPlayer", "m_flFlashDuration", 0x43B0134C, 0x34E24B90);
+#else
 	*(PDWORD)0x43AFE63C = engine_vgui_hook->hook_function(0x34E26660, 14); // EngineVGUI::Paint original
 	*(PDWORD)0x43AFE630 = client_hook->hook_function(0x34E26330, 36); // CHLClient::FrameStageNotify original
 	*(PDWORD)0x43AFE178 = client_mode_hook->hook_function(0x34E258A0, 24); // ClientMode::CreateMove original
@@ -659,6 +684,7 @@ void init_aw_hooks()
 	hook_netvar("CCSPlayer", "m_flLowerBodyYawTarget", 0x43B01334, 0x34E24EC0);
 	hook_netvar("CBasePlayer", "m_fFlags", 0x43B01340, 0x34E24F40);
 	hook_netvar("CCSPlayer", "m_flFlashDuration", 0x43B0134C, 0x34E24B90);
+#endif
 }
 
 void init_local_interfaces()
@@ -739,6 +765,9 @@ DWORD WINAPI install_thread(PVOID a1)
 
 	log("restoring stuff...");
 	fix_post_oep_crap();
+
+	log("initializing decompiled engine...");
+	Aimware2016Decompiled::InitializeDecompiledEngine();
 
 	log("initializing hooks...");
 	init_aw_hooks();
