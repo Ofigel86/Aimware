@@ -2,39 +2,25 @@
 #define NOMINMAX
 #include <Windows.h>
 #include <iostream>
-#include <intrin.h>
-#include <fstream>
 #include <vector>
 #include <string>
-#include <tuple>
-#include <deque>
 #include <unordered_map>
 #include <Psapi.h>
 #include <memory>
-#include <functional>
 
-// Core includes - advanced mapping system
+// Core - только маппер и логгер
 #include "core/logger.hpp"
+#include "core/mapper.hpp"
 #include "core/sdk.hpp"
-#include "core/memory_manager.hpp"
 #include "core/config_system.hpp"
-#include "core/pe_parser.hpp"
-#include "core/decryptor.hpp"
-#include "core/advanced_mapper.hpp"
 
-// Full reverse engineering docs
-#include "reversed/memory_map.hpp"
-#include "reversed/config_struct.hpp"
-#include "reversed/offsets.hpp"
-#include "reversed/functions.hpp"
-
-// Binary dumps
+// Dumps
 #include "b7C4A0000.h"
 #include "b76ED0000.h"
 #include "b43AF0000.h"
 #include "b34E10000.h"
 
-// Decompiled engine
+// Decompiled
 #include "decompiled/aimware_decompiled.hpp"
 
 // Managers
@@ -42,15 +28,11 @@
 #include "netvars_manager.hpp"
 #include "util.hpp"
 
-// Feature toggles
 #define USE_DECOMPILED_ENGINE
-#define USE_ADVANCED_MAPPER
 
-// Compatibility
 using namespace Aimware;
 using namespace Aimware::SDK;
 
-// Legacy structs for binary compatibility
 struct AwRender {
     void* vtable;
     bool DidCreateFont;
@@ -75,14 +57,11 @@ struct AwSkinChangerData {
     void* sequence_proxy;
 };
 
-// Enhanced global context with full reverse info
 struct GlobalState {
-    // Render & Globals
     AwRender* render = nullptr;
     AwGlobals* global_ctx = nullptr;
     AwSkinChangerData* skinchanger_ctx = nullptr;
 
-    // Interfaces
     void* engine_vgui = nullptr;
     std::unique_ptr<VMTHook> engine_vgui_hook;
 
@@ -104,12 +83,6 @@ struct GlobalState {
     void* studio_render = nullptr;
     std::unique_ptr<VMTHook> studio_render_hook;
 
-    void* view_render = nullptr;
-    std::unique_ptr<VMTHook> view_render_hook;
-
-    void* fire_bullets = nullptr;
-    std::unique_ptr<VMTHook> fire_bullets_hook;
-
     ICvar* cvars = nullptr;
     HWND window = nullptr;
     WNDPROC orig_wndproc = nullptr;
@@ -117,16 +90,10 @@ struct GlobalState {
     NetvarManager netvars;
     std::vector<std::pair<uintptr_t, uintptr_t>> hooked_netvars;
 
-    // Advanced mapper
-    Mapping::AdvancedMapper* mapper = nullptr;
-
-    // Decryption
-    int profileXorKey = 0;
-    std::vector<Crypto::StringDecryptor::EncryptedString> decryptedStrings;
+    Mapping::Mapper* mapper = nullptr;
 
     bool initialized = false;
     bool panic = false;
-    bool useAdvancedMapper = true;
 
     static GlobalState& Instance() {
         static GlobalState state;
@@ -141,37 +108,22 @@ struct GlobalState {
         surface_hook.reset();
         trace_hook.reset();
         studio_render_hook.reset();
-        view_render_hook.reset();
-        fire_bullets_hook.reset();
         hooked_netvars.clear();
-        if (mapper) {
-            mapper->UnmapAll();
-        }
+        if (mapper) mapper->UnmapAll();
         initialized = false;
     }
 };
 
-// Function declarations
 namespace Aimware {
-
-bool InitializeMemoryDumps();
-bool InitializeMemoryDumpsAdvanced();
-bool InitializeInterfaces();
-bool InitializeNetvars();
-bool InitializeHooks();
-void Shutdown();
-
-void HookNetvar(const char* table, const char* var, uintptr_t original_addr, uintptr_t hook_fn);
-void UnhookNetvars();
-
-void FixImports();
-void FixImportsAdvanced();
-void FixAddresses();
-void FixConvars();
-void FixPostOEP();
-void FixXorPatches();
-
-bool DecryptStringSection();
-void AnalyzeDumps();
-
-} // namespace Aimware
+    bool InitializeMemoryDumps();
+    bool InitializeInterfaces();
+    bool InitializeNetvars();
+    bool InitializeHooks();
+    void Shutdown();
+    void HookNetvar(const char* table, const char* var, uintptr_t original_addr, uintptr_t hook_fn);
+    void UnhookNetvars();
+    void FixImports();
+    void FixAddresses();
+    void FixConvars();
+    void FixPostOEP();
+}

@@ -3,17 +3,12 @@
   <ItemGroup>
     <Filter Include="Source">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
     <Filter Include="Headers">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
     </Filter>
     <Filter Include="Headers\Core">
       <UniqueIdentifier>{A1B2C3D4-E5F6-7890-1234-56789ABCDEF1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Headers\Reversed">
-      <UniqueIdentifier>{C3D4E5F6-A7B8-9012-3456-789ABCDEF012}</UniqueIdentifier>
     </Filter>
     <Filter Include="Decompiled">
       <UniqueIdentifier>{D1E2F3A4-B5C6-7890-1234-56789ABCDEF0}</UniqueIdentifier>
@@ -23,122 +18,40 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="aw.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="hooking_manager.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="netvars_manager.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="decompiled\aimbot_engine.cpp">
-      <Filter>Decompiled</Filter>
-    </ClCompile>
-    <ClCompile Include="decompiled\antiaim_engine.cpp">
-      <Filter>Decompiled</Filter>
-    </ClCompile>
-    <ClCompile Include="decompiled\resolver_engine.cpp">
-      <Filter>Decompiled</Filter>
-    </ClCompile>
-    <ClCompile Include="decompiled\visuals_engine.cpp">
-      <Filter>Decompiled</Filter>
-    </ClCompile>
-    <ClCompile Include="decompiled\skinchanger_engine.cpp">
-      <Filter>Decompiled</Filter>
-    </ClCompile>
-    <ClCompile Include="decompiled\config_ui_engine.cpp">
-      <Filter>Decompiled</Filter>
-    </ClCompile>
+    <ClCompile Include="aw.cpp"><Filter>Source</Filter></ClCompile>
+    <ClCompile Include="hooking_manager.cpp"><Filter>Source</Filter></ClCompile>
+    <ClCompile Include="netvars_manager.cpp"><Filter>Source</Filter></ClCompile>
+    <ClCompile Include="decompiled\aimbot_engine.cpp"><Filter>Decompiled</Filter></ClCompile>
+    <ClCompile Include="decompiled\antiaim_engine.cpp"><Filter>Decompiled</Filter></ClCompile>
+    <ClCompile Include="decompiled\resolver_engine.cpp"><Filter>Decompiled</Filter></ClCompile>
+    <ClCompile Include="decompiled\visuals_engine.cpp"><Filter>Decompiled</Filter></ClCompile>
+    <ClCompile Include="decompiled\skinchanger_engine.cpp"><Filter>Decompiled</Filter></ClCompile>
+    <ClCompile Include="decompiled\config_ui_engine.cpp"><Filter>Decompiled</Filter></ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="b76ED0000.h">
-      <Filter>BinaryDumps</Filter>
-    </ClInclude>
-    <ClInclude Include="b43AF0000.h">
-      <Filter>BinaryDumps</Filter>
-    </ClInclude>
-    <ClInclude Include="b34E10000.h">
-      <Filter>BinaryDumps</Filter>
-    </ClInclude>
-    <ClInclude Include="b7C4A0000.h">
-      <Filter>BinaryDumps</Filter>
-    </ClInclude>
-    <ClInclude Include="aw.h">
-      <Filter>Headers</Filter>
-    </ClInclude>
-    <ClInclude Include="util.h">
-      <Filter>Headers</Filter>
-    </ClInclude>
-    <ClInclude Include="util.hpp">
-      <Filter>Headers</Filter>
-    </ClInclude>
-    <ClInclude Include="detours.h">
-      <Filter>Headers</Filter>
-    </ClInclude>
-    <ClInclude Include="hooking_manager.hpp">
-      <Filter>Headers</Filter>
-    </ClInclude>
-    <ClInclude Include="netvars_manager.hpp">
-      <Filter>Headers</Filter>
-    </ClInclude>
-    <ClInclude Include="core\logger.hpp">
-      <Filter>Headers\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="core\memory_manager.hpp">
-      <Filter>Headers\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="core\sdk.hpp">
-      <Filter>Headers\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="core\config_system.hpp">
-      <Filter>Headers\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="core\pe_parser.hpp">
-      <Filter>Headers\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="core\decryptor.hpp">
-      <Filter>Headers\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="core\advanced_mapper.hpp">
-      <Filter>Headers\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="reversed\memory_map.hpp">
-      <Filter>Headers\Reversed</Filter>
-    </ClInclude>
-    <ClInclude Include="reversed\config_struct.hpp">
-      <Filter>Headers\Reversed</Filter>
-    </ClInclude>
-    <ClInclude Include="reversed\offsets.hpp">
-      <Filter>Headers\Reversed</Filter>
-    </ClInclude>
-    <ClInclude Include="reversed\functions.hpp">
-      <Filter>Headers\Reversed</Filter>
-    </ClInclude>
-    <ClInclude Include="decompiled\decompiled_sdk.hpp">
-      <Filter>Decompiled</Filter>
-    </ClInclude>
-    <ClInclude Include="decompiled\aimware_decompiled.hpp">
-      <Filter>Decompiled</Filter>
-    </ClInclude>
-    <ClInclude Include="decompiled\aimbot_engine.hpp">
-      <Filter>Decompiled</Filter>
-    </ClInclude>
-    <ClInclude Include="decompiled\antiaim_engine.hpp">
-      <Filter>Decompiled</Filter>
-    </ClInclude>
-    <ClInclude Include="decompiled\resolver_engine.hpp">
-      <Filter>Decompiled</Filter>
-    </ClInclude>
-    <ClInclude Include="decompiled\visuals_engine.hpp">
-      <Filter>Decompiled</Filter>
-    </ClInclude>
-    <ClInclude Include="decompiled\skinchanger_engine.hpp">
-      <Filter>Decompiled</Filter>
-    </ClInclude>
-    <ClInclude Include="decompiled\config_ui_engine.hpp">
-      <Filter>Decompiled</Filter>
-    </ClInclude>
+    <ClInclude Include="b76ED0000.h"><Filter>BinaryDumps</Filter></ClInclude>
+    <ClInclude Include="b43AF0000.h"><Filter>BinaryDumps</Filter></ClInclude>
+    <ClInclude Include="b34E10000.h"><Filter>BinaryDumps</Filter></ClInclude>
+    <ClInclude Include="b7C4A0000.h"><Filter>BinaryDumps</Filter></ClInclude>
+    <ClInclude Include="aw.h"><Filter>Headers</Filter></ClInclude>
+    <ClInclude Include="util.h"><Filter>Headers</Filter></ClInclude>
+    <ClInclude Include="util.hpp"><Filter>Headers</Filter></ClInclude>
+    <ClInclude Include="detours.h"><Filter>Headers</Filter></ClInclude>
+    <ClInclude Include="hooking_manager.hpp"><Filter>Headers</Filter></ClInclude>
+    <ClInclude Include="netvars_manager.hpp"><Filter>Headers</Filter></ClInclude>
+    <ClInclude Include="core\logger.hpp"><Filter>Headers\Core</Filter></ClInclude>
+    <ClInclude Include="core\mapper.hpp"><Filter>Headers\Core</Filter></ClInclude>
+    <ClInclude Include="core\sdk.hpp"><Filter>Headers\Core</Filter></ClInclude>
+    <ClInclude Include="core\config_system.hpp"><Filter>Headers\Core</Filter></ClInclude>
+    <ClInclude Include="core\memory_manager.hpp"><Filter>Headers\Core</Filter></ClInclude>
+    <ClInclude Include="decompiled\decompiled_sdk.hpp"><Filter>Decompiled</Filter></ClInclude>
+    <ClInclude Include="decompiled\aimware_decompiled.hpp"><Filter>Decompiled</Filter></ClInclude>
+    <ClInclude Include="decompiled\aimbot_engine.hpp"><Filter>Decompiled</Filter></ClInclude>
+    <ClInclude Include="decompiled\antiaim_engine.hpp"><Filter>Decompiled</Filter></ClInclude>
+    <ClInclude Include="decompiled\resolver_engine.hpp"><Filter>Decompiled</Filter></ClInclude>
+    <ClInclude Include="decompiled\visuals_engine.hpp"><Filter>Decompiled</Filter></ClInclude>
+    <ClInclude Include="decompiled\skinchanger_engine.hpp"><Filter>Decompiled</Filter></ClInclude>
+    <ClInclude Include="decompiled\config_ui_engine.hpp"><Filter>Decompiled</Filter></ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Library Include="detours.lib" />
