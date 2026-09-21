@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Исходные файлы">
@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Decompiled">
+      <UniqueIdentifier>{D1E2F3A4-B5C6-7890-1234-56789ABCDEF0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="aw.cpp">
@@ -23,6 +26,24 @@
     </ClCompile>
     <ClCompile Include="netvars_manager.cpp">
       <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="decompiled\aimbot_engine.cpp">
+      <Filter>Decompiled</Filter>
+    </ClCompile>
+    <ClCompile Include="decompiled\antiaim_engine.cpp">
+      <Filter>Decompiled</Filter>
+    </ClCompile>
+    <ClCompile Include="decompiled\resolver_engine.cpp">
+      <Filter>Decompiled</Filter>
+    </ClCompile>
+    <ClCompile Include="decompiled\visuals_engine.cpp">
+      <Filter>Decompiled</Filter>
+    </ClCompile>
+    <ClCompile Include="decompiled\skinchanger_engine.cpp">
+      <Filter>Decompiled</Filter>
+    </ClCompile>
+    <ClCompile Include="decompiled\config_ui_engine.cpp">
+      <Filter>Decompiled</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -52,6 +73,30 @@
     </ClInclude>
     <ClInclude Include="netvars_manager.hpp">
       <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="decompiled\decompiled_sdk.hpp">
+      <Filter>Decompiled</Filter>
+    </ClInclude>
+    <ClInclude Include="decompiled\aimware_decompiled.hpp">
+      <Filter>Decompiled</Filter>
+    </ClInclude>
+    <ClInclude Include="decompiled\aimbot_engine.hpp">
+      <Filter>Decompiled</Filter>
+    </ClInclude>
+    <ClInclude Include="decompiled\antiaim_engine.hpp">
+      <Filter>Decompiled</Filter>
+    </ClInclude>
+    <ClInclude Include="decompiled\resolver_engine.hpp">
+      <Filter>Decompiled</Filter>
+    </ClInclude>
+    <ClInclude Include="decompiled\visuals_engine.hpp">
+      <Filter>Decompiled</Filter>
+    </ClInclude>
+    <ClInclude Include="decompiled\skinchanger_engine.hpp">
+      <Filter>Decompiled</Filter>
+    </ClInclude>
+    <ClInclude Include="decompiled\config_ui_engine.hpp">
+      <Filter>Decompiled</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -90,6 +90,12 @@
     <ClCompile Include="aw.cpp" />
     <ClCompile Include="hooking_manager.cpp" />
     <ClCompile Include="netvars_manager.cpp" />
+    <ClCompile Include="decompiled\aimbot_engine.cpp" />
+    <ClCompile Include="decompiled\antiaim_engine.cpp" />
+    <ClCompile Include="decompiled\resolver_engine.cpp" />
+    <ClCompile Include="decompiled\visuals_engine.cpp" />
+    <ClCompile Include="decompiled\skinchanger_engine.cpp" />
+    <ClCompile Include="decompiled\config_ui_engine.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="aw.h" />
@@ -101,6 +107,14 @@
     <ClInclude Include="hooking_manager.hpp" />
     <ClInclude Include="netvars_manager.hpp" />
     <ClInclude Include="util.h" />
+    <ClInclude Include="decompiled\decompiled_sdk.hpp" />
+    <ClInclude Include="decompiled\aimware_decompiled.hpp" />
+    <ClInclude Include="decompiled\aimbot_engine.hpp" />
+    <ClInclude Include="decompiled\antiaim_engine.hpp" />
+    <ClInclude Include="decompiled\resolver_engine.hpp" />
+    <ClInclude Include="decompiled\visuals_engine.hpp" />
+    <ClInclude Include="decompiled\skinchanger_engine.hpp" />
+    <ClInclude Include="decompiled\config_ui_engine.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="detours.lib" />
