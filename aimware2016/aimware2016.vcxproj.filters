@@ -1,31 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Исходные файлы">
+    <Filter Include="Source">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Файлы заголовков">
+    <Filter Include="Headers">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
     </Filter>
-    <Filter Include="Файлы ресурсов">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    <Filter Include="Headers\Core">
+      <UniqueIdentifier>{A1B2C3D4-E5F6-7890-1234-56789ABCDEF1}</UniqueIdentifier>
     </Filter>
     <Filter Include="Decompiled">
       <UniqueIdentifier>{D1E2F3A4-B5C6-7890-1234-56789ABCDEF0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="BinaryDumps">
+      <UniqueIdentifier>{B2C3D4E5-F6A7-8901-2345-6789ABCDEF02}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="aw.cpp">
-      <Filter>Исходные файлы</Filter>
+      <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="hooking_manager.cpp">
-      <Filter>Исходные файлы</Filter>
+      <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="netvars_manager.cpp">
-      <Filter>Исходные файлы</Filter>
+      <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="decompiled\aimbot_engine.cpp">
       <Filter>Decompiled</Filter>
@@ -48,31 +50,46 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="b76ED0000.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>BinaryDumps</Filter>
     </ClInclude>
     <ClInclude Include="b43AF0000.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>BinaryDumps</Filter>
     </ClInclude>
     <ClInclude Include="b34E10000.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>BinaryDumps</Filter>
     </ClInclude>
     <ClInclude Include="b7C4A0000.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>BinaryDumps</Filter>
     </ClInclude>
     <ClInclude Include="aw.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>Headers</Filter>
     </ClInclude>
     <ClInclude Include="util.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="util.hpp">
+      <Filter>Headers</Filter>
     </ClInclude>
     <ClInclude Include="detours.h">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>Headers</Filter>
     </ClInclude>
     <ClInclude Include="hooking_manager.hpp">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>Headers</Filter>
     </ClInclude>
     <ClInclude Include="netvars_manager.hpp">
-      <Filter>Файлы заголовков</Filter>
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="core\logger.hpp">
+      <Filter>Headers\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\memory_manager.hpp">
+      <Filter>Headers\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\sdk.hpp">
+      <Filter>Headers\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\config_system.hpp">
+      <Filter>Headers\Core</Filter>
     </ClInclude>
     <ClInclude Include="decompiled\decompiled_sdk.hpp">
       <Filter>Decompiled</Filter>

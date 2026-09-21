@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.37314.3
@@ -9,14 +9,24 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "awinjector", "awinjector\aw
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
 		Rel_Mar2017|x86 = Rel_Mar2017|x86
 		Rel_Mar2018|x86 = Rel_Mar2018|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8298ABA7-445B-48BD-8F72-FE610C0E46A6}.Debug|x86.ActiveCfg = Debug|Win32
+		{8298ABA7-445B-48BD-8F72-FE610C0E46A6}.Debug|x86.Build.0 = Debug|Win32
+		{8298ABA7-445B-48BD-8F72-FE610C0E46A6}.Release|x86.ActiveCfg = Release|Win32
+		{8298ABA7-445B-48BD-8F72-FE610C0E46A6}.Release|x86.Build.0 = Release|Win32
 		{8298ABA7-445B-48BD-8F72-FE610C0E46A6}.Rel_Mar2017|x86.ActiveCfg = Rel_Mar2017|Win32
 		{8298ABA7-445B-48BD-8F72-FE610C0E46A6}.Rel_Mar2017|x86.Build.0 = Rel_Mar2017|Win32
 		{8298ABA7-445B-48BD-8F72-FE610C0E46A6}.Rel_Mar2018|x86.ActiveCfg = Rel_Mar2018|Win32
 		{8298ABA7-445B-48BD-8F72-FE610C0E46A6}.Rel_Mar2018|x86.Build.0 = Rel_Mar2018|Win32
+		{312F91C9-5E77-4A3C-A167-6E8D8F5D3884}.Debug|x86.ActiveCfg = Debug|Win32
+		{312F91C9-5E77-4A3C-A167-6E8D8F5D3884}.Debug|x86.Build.0 = Debug|Win32
+		{312F91C9-5E77-4A3C-A167-6E8D8F5D3884}.Release|x86.ActiveCfg = Release|Win32
+		{312F91C9-5E77-4A3C-A167-6E8D8F5D3884}.Release|x86.Build.0 = Release|Win32
 		{312F91C9-5E77-4A3C-A167-6E8D8F5D3884}.Rel_Mar2017|x86.ActiveCfg = Release|Win32
 		{312F91C9-5E77-4A3C-A167-6E8D8F5D3884}.Rel_Mar2017|x86.Build.0 = Release|Win32
 		{312F91C9-5E77-4A3C-A167-6E8D8F5D3884}.Rel_Mar2018|x86.ActiveCfg = Release|Win32

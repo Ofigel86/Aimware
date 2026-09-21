@@ -1,73 +1,51 @@
 #pragma once
-
 #include <unordered_map>
 #include <string>
+#include <vector>
+#include <optional>
+#include "core/sdk.hpp"
+#include "core/logger.hpp"
 
-typedef enum {
-	DPT_Int = 0,
-	DPT_Float,
-	DPT_Vector,
-	DPT_VectorXY,
-	DPT_String,
-	DPT_Array,
-	DPT_DataTable,
-	DPT_Int64,
-	DPT_NUMSendPropTypes
-} Type;
+namespace Aimware {
 
-struct recvProxyData { //-V802
-	int pad;
-	union {
-		float _float;
-		long _int;
-		char* _string;
-		void* data;
-		float _x;
-		float _y;
-		float _z;
-		int64_t int64;
-	} value;
-	Type m_Type;
-};
+using namespace SDK;
 
-using recvProxy = std::add_pointer_t<void(recvProxyData&, void*, void*)>;
-
-struct RecvProp {
-	char* name;
-	int type;
-	int flags;
-	int stringBufferSize;
-	int insideArray;
-	const void* extraData;
-	RecvProp* arrayProp;
-	void* arrayLengthProxy;
-	recvProxy proxy;
-	void* dataTableProxy;
-	struct RecvTable* dataTable;
-	int offset;
-	int elementStride;
-	int elementCount;
-	const char* parentArrayPropName;
-};
-
-struct RecvTable {
-	RecvProp* props;
-	int propCount;
-	void* decoder;
-	char* netTableName;
-	bool isInitialized;
-	bool isInMainList;
-};
-
-class netvars
-{
+class NetvarManager {
 public:
-	std::unordered_map<std::string, void*> classes;
-	std::unordered_map<std::string, RecvTable*> tables;
+    std::unordered_map<std::string, void*> classes;
+    std::unordered_map<std::string, RecvTable*> tables;
 
-	int get_offset(const char* tableName, const char* propName);
-	int get_prop(const char* tableName, const char* propName, RecvProp** prop = 0);
-	int get_prop(RecvTable* recvTable, const char* propName, RecvProp** prop = 0);
-	void* get_class(const char* className);
-	RecvTable* get_table(const char* tableName);
+    // Returns offset or 0 if not found
+    int GetOffset(const char* tableName, const char* propName);
+
+    // Returns offset and optionally fills prop pointer
+    int GetProp(const char* tableName, const char* propName, RecvProp** outProp = nullptr);
+
+    // Recursive search
+    int GetProp(RecvTable* recvTable, const char* propName, RecvProp** outProp = nullptr);
+
+    // Get class pointer
+    void* GetClass(const char* className);
+
+    // Get table pointer
+    RecvTable* GetTable(const char* tableName);
+
+    // Dump all netvars for debugging
+    void DumpNetvars(const char* filter = nullptr);
+
+    // Initialize from client
+    bool Initialize(IBaseClientDLL* client);
+
+    void Clear() {
+        classes.clear();
+        tables.clear();
+    }
+
+private:
+    int GetPropRecursive(RecvTable* table, const char* propName, RecvProp** outProp, int accumulatedOffset);
 };
+
+// Compatibility alias
+using netvars = NetvarManager;
+
+} // namespace Aimware

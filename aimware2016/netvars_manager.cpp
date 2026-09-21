@@ -1,83 +1,113 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: http://www.viva64.com
-
 #include "netvars_manager.hpp"
-#include <cctype>
+#include <iostream>
 
-int netvars::get_offset(const char *tableName, const char *propName) 
-{
-	int offs = get_prop(tableName, propName);
+namespace Aimware {
 
-	if (!offs)
-		return 0;
-
-	return offs;
+int NetvarManager::GetOffset(const char* tableName, const char* propName) {
+    return GetProp(tableName, propName, nullptr);
 }
 
-int netvars::get_prop(const char *tableName, const char *propName, RecvProp **prop) 
-{
-	RecvTable *recvTable = this->get_table(tableName);
-
-	if (!recvTable)
-		return 0;
-
-	int offs = get_prop(recvTable, propName, prop);
-
-	if (!offs)
-		return 0;
-
-	return offs;
+int NetvarManager::GetProp(const char* tableName, const char* propName, RecvProp** outProp) {
+    RecvTable* table = GetTable(tableName);
+    if (!table) {
+        LOG_WARN("Netvar table %s not found", tableName);
+        return 0;
+    }
+    return GetProp(table, propName, outProp);
 }
 
-int netvars::get_prop(RecvTable *recvTable, const char *propName, RecvProp **prop) 
-{
-	int extrOffs = 0;
-
-	for (int i = 0; i < recvTable->propCount; i++) 
-	{
-		auto *recvProp = &recvTable->props[i];
-		auto recvChild = recvProp->dataTable;
-
-		if (recvChild && (recvChild->propCount > 0)) 
-		{
-			int tmp = get_prop(recvChild, propName, prop);
-
-			if (tmp)
-				extrOffs += (recvProp->offset + tmp);
-		}
-
-		if (strcmp(recvProp->name, propName)) //-V526
-			continue;
-
-		if (prop)
-			*prop = recvProp;
-
-		return (recvProp->offset + extrOffs);
-	}
-
-	return extrOffs;
+int NetvarManager::GetProp(RecvTable* recvTable, const char* propName, RecvProp** outProp) {
+    if (!recvTable || !propName) return 0;
+    return GetPropRecursive(recvTable, propName, outProp, 0);
 }
 
-void* netvars::get_class(const char* className)
-{
-	if (classes.empty())
-		return 0;
+int NetvarManager::GetPropRecursive(RecvTable* table, const char* propName, RecvProp** outProp, int accumulatedOffset) {
+    if (!table) return 0;
 
-	for (auto class_ : classes)
-		if (!strcmp(class_.first.c_str(), className))
-			return class_.second;
+    for (int i = 0; i < table->propCount; ++i) {
+        RecvProp* prop = &table->props[i];
+        if (!prop) continue;
 
-	return 0;
+        // If this prop is a datatable, recurse
+        if (prop->dataTable && prop->dataTable->propCount > 0) {
+            int result = GetPropRecursive(prop->dataTable, propName, outProp, accumulatedOffset + prop->offset);
+            if (result != 0) {
+                return result;
+            }
+        }
+
+        // Direct match
+        if (prop->name && strcmp(prop->name, propName) == 0) {
+            if (outProp) *outProp = prop;
+            return accumulatedOffset + prop->offset;
+        }
+    }
+    return 0;
 }
 
-RecvTable *netvars::get_table(const char *tableName) 
-{
-	if (tables.empty())
-		return 0;
+void* NetvarManager::GetClass(const char* className) {
+    if (classes.empty() || !className) return nullptr;
+    auto it = classes.find(className);
+    if (it != classes.end()) return it->second;
 
-	for (auto table : tables) 
-		if (!strcmp(table.first.c_str(), tableName))
-			return table.second;
-
-	return 0;
+    // Fallback linear search (case for unordered_map)
+    for (auto& kv : classes) {
+        if (kv.first == className) return kv.second;
+    }
+    return nullptr;
 }
+
+RecvTable* NetvarManager::GetTable(const char* tableName) {
+    if (tables.empty() || !tableName) return nullptr;
+    auto it = tables.find(tableName);
+    if (it != tables.end()) return it->second;
+
+    for (auto& kv : tables) {
+        if (kv.first == tableName) return kv.second;
+    }
+    return nullptr;
+}
+
+bool NetvarManager::Initialize(IBaseClientDLL* client) {
+    if (!client) {
+        LOG_ERROR("NetvarManager::Initialize - null client");
+        return false;
+    }
+
+    Clear();
+    ClientClass* clientClass = client->GetAllClasses();
+    if (!clientClass) {
+        LOG_ERROR("GetAllClasses returned null");
+        return false;
+    }
+
+    int count = 0;
+    while (clientClass) {
+        RecvTable* recvTable = clientClass->m_pRecvTable;
+        if (recvTable && clientClass->m_pNetworkName) {
+            classes.emplace(clientClass->m_pNetworkName, clientClass);
+            tables.emplace(clientClass->m_pNetworkName, recvTable);
+            ++count;
+        }
+        clientClass = clientClass->m_pNext;
+    }
+
+    LOG_SUCCESS("NetvarManager initialized: %d tables", count);
+    return count > 0;
+}
+
+void NetvarManager::DumpNetvars(const char* filter) {
+    LOG_INFO("=== Netvar Dump %s ===", filter ? filter : "ALL");
+    for (auto& [name, table] : tables) {
+        if (filter && name.find(filter) == std::string::npos) continue;
+        LOG_INFO("Table: %s (%d props)", name.c_str(), table->propCount);
+        for (int i = 0; i < table->propCount; ++i) {
+            RecvProp* prop = &table->props[i];
+            if (prop && prop->name) {
+                LOG_INFO("  [%d] %s -> 0x%04X (type %d)", i, prop->name, prop->offset, prop->type);
+            }
+        }
+    }
+}
+
+} // namespace Aimware

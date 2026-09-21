@@ -1,785 +1,909 @@
 #include "aw.h"
-#include "util.h"
-
 #include "detours.h"
-#include "hooking_manager.hpp"
-#include "netvars_manager.hpp"
 
 #define CSGO2016
 
-bool call_in_bounds(void* addr)
-{
-	uintptr_t u = (uintptr_t)addr;
-	return u > 0x34E10000 && u < (0x34E10000 + sizeof(b34E10000));
+using namespace Aimware;
+using namespace Aimware::Utils;
+
+bool call_in_bounds(void* addr) {
+    uintptr_t u = (uintptr_t)addr;
+    return u > 0x34E10000 && u < (0x34E10000 + sizeof(b34E10000));
 }
 
-// reconstructed manually... guessed... ~95% accuracy
+// ===================== Import Table =====================
 std::unordered_map<DWORD, std::pair<const char*, const char*>> imports = {
-	// kernel32.dll, 100% restored
-	{ 0x7C4B3E80, { "kernel32.dll", "GetCurrentProcessId" } },
-	{ 0x7C4B3E84, { "kernel32.dll", "GetFileSize" } },
-	{ 0x7C4B3E88, { "kernel32.dll", "FindFirstFileW" } },
-	{ 0x7C4B3E8C, { "kernel32.dll", "FindClose" } },
-	{ 0x7C4B3E90, { "kernel32.dll", "FindNextFileW" } },
-	{ 0x7C4B3E94, { "kernel32.dll", "GlobalLock" } },
-	{ 0x7C4B3E98, { "kernel32.dll", "GlobalAlloc" } },
-	{ 0x7C4B3E9C, { "kernel32.dll", "GlobalUnlock" } },
-	{ 0x7C4B3EA0, { "kernel32.dll", "GlobalFree" } },
-	{ 0x7C4B3EA4, { "kernel32.dll", "MultiByteToWideChar" } },
+    { 0x7C4B3E80, { "kernel32.dll", "GetCurrentProcessId" } },
+    { 0x7C4B3E84, { "kernel32.dll", "GetFileSize" } },
+    { 0x7C4B3E88, { "kernel32.dll", "FindFirstFileW" } },
+    { 0x7C4B3E8C, { "kernel32.dll", "FindClose" } },
+    { 0x7C4B3E90, { "kernel32.dll", "FindNextFileW" } },
+    { 0x7C4B3E94, { "kernel32.dll", "GlobalLock" } },
+    { 0x7C4B3E98, { "kernel32.dll", "GlobalAlloc" } },
+    { 0x7C4B3E9C, { "kernel32.dll", "GlobalUnlock" } },
+    { 0x7C4B3EA0, { "kernel32.dll", "GlobalFree" } },
+    { 0x7C4B3EA4, { "kernel32.dll", "MultiByteToWideChar" } },
 
-	// user32.dll, 90% restored
-	{ 0x7C4B3EAC, { "user32.dll", "CloseClipboard" } },
-	{ 0x7C4B3EB0, { "user32.dll", "IsClipboardFormatAvailable" } },
-	{ 0x7C4B3EB4, { "user32.dll", "GetClipboardData" } },
-	{ 0x7C4B3EB8, { "user32.dll", "GetCursorPos" } },
-	{ 0x7C4B3EBC, { "user32.dll", "CallWindowProcA" } },
-	{ 0x7C4B3EC0, { "user32.dll", "GetWindowTextA" } },
-	{ 0x7C4B3EC4, { "user32.dll", "SetWindowLongW" } },
-	{ 0x7C4B3EC8, { "user32.dll", "GetRawInputData" } },
-	{ 0x7C4B3ECC, { "user32.dll", "ScreenToClient" } },
-	{ 0x7C4B3ED0, { "user32.dll", "GetClientRect" } },
-	{ 0x7C4B3ED4, { "user32.dll", "GetWindowThreadProcessId" } },
-	{ 0x7C4B3EE0, { "user32.dll", "SetClipboardData" } },
-	{ 0x7C4B3EE4, { "user32.dll", "OpenClipboard" } },
-	{ 0x7C4B3EE8, { "user32.dll", "EmptyClipboard" } },
+    { 0x7C4B3EAC, { "user32.dll", "CloseClipboard" } },
+    { 0x7C4B3EB0, { "user32.dll", "IsClipboardFormatAvailable" } },
+    { 0x7C4B3EB4, { "user32.dll", "GetClipboardData" } },
+    { 0x7C4B3EB8, { "user32.dll", "GetCursorPos" } },
+    { 0x7C4B3EBC, { "user32.dll", "CallWindowProcA" } },
+    { 0x7C4B3EC0, { "user32.dll", "GetWindowTextA" } },
+    { 0x7C4B3EC4, { "user32.dll", "SetWindowLongW" } },
+    { 0x7C4B3EC8, { "user32.dll", "GetRawInputData" } },
+    { 0x7C4B3ECC, { "user32.dll", "ScreenToClient" } },
+    { 0x7C4B3ED0, { "user32.dll", "GetClientRect" } },
+    { 0x7C4B3ED4, { "user32.dll", "GetWindowThreadProcessId" } },
+    { 0x7C4B3EE0, { "user32.dll", "SetClipboardData" } },
+    { 0x7C4B3EE4, { "user32.dll", "OpenClipboard" } },
+    { 0x7C4B3EE8, { "user32.dll", "EmptyClipboard" } },
 
-	// msvcrt.dll, 100% restored
-	{ 0x7C4B3EF4, { "msvcrt.dll", "tolower" } },
-	{ 0x7C4B3EF8, { "msvcrt.dll", "_vswprintf_c_l" } },
-	{ 0x7C4B3EFC, { "msvcrt.dll", "wcsncpy" } },
-	{ 0x7C4B3F00, { "msvcrt.dll", "strncpy" } },
-	{ 0x7C4B3F04, { "msvcrt.dll", "memset" } },
-	{ 0x7C4B3F08, { "msvcrt.dll", "sscanf" } },
-	{ 0x7C4B3F0C, { "msvcrt.dll", "sprintf" } },
-	{ 0x7C4B3F10, { "msvcrt.dll", "vswprintf" } },
-	{ 0x7C4B3F14, { "msvcrt.dll", "atoi" } },
-	{ 0x7C4B3F18, { "msvcrt.dll", "strchr" } },
-	{ 0x7C4B3F1C, { "msvcrt.dll", "strstr" } },
-	{ 0x7C4B3F20, { "msvcrt.dll", "_CIfmod" } },
-	{ 0x7C4B3F24, { "msvcrt.dll", "__libm_sse2_asinf" } },
-	{ 0x7C4B3F28, { "msvcrt.dll", "__libm_sse2_atan" } },
-	{ 0x7C4B3F2C, { "msvcrt.dll", "__libm_sse2_atan2" } },
-	{ 0x7C4B3F30, { "msvcrt.dll", "__libm_sse2_atanf" } },
-	{ 0x7C4B3F34, { "msvcrt.dll", "__libm_sse2_cosf" } },
-	{ 0x7C4B3F38, { "msvcrt.dll", "__libm_sse2_powf" } },
-	{ 0x7C4B3F3C, { "msvcrt.dll", "__libm_sse2_sinf" } },
-	{ 0x7C4B3F40, { "msvcrt.dll", "memcpy" } },
-	{ 0x7C4B3F44, { "msvcrt.dll", "toupper" } },
+    { 0x7C4B3EF4, { "msvcrt.dll", "tolower" } },
+    { 0x7C4B3EF8, { "msvcrt.dll", "_vswprintf_c_l" } },
+    { 0x7C4B3EFC, { "msvcrt.dll", "wcsncpy" } },
+    { 0x7C4B3F00, { "msvcrt.dll", "strncpy" } },
+    { 0x7C4B3F04, { "msvcrt.dll", "memset" } },
+    { 0x7C4B3F08, { "msvcrt.dll", "sscanf" } },
+    { 0x7C4B3F0C, { "msvcrt.dll", "sprintf" } },
+    { 0x7C4B3F10, { "msvcrt.dll", "vswprintf" } },
+    { 0x7C4B3F14, { "msvcrt.dll", "atoi" } },
+    { 0x7C4B3F18, { "msvcrt.dll", "strchr" } },
+    { 0x7C4B3F1C, { "msvcrt.dll", "strstr" } },
+    { 0x7C4B3F20, { "msvcrt.dll", "_CIfmod" } },
+    { 0x7C4B3F24, { "msvcrt.dll", "__libm_sse2_asinf" } },
+    { 0x7C4B3F28, { "msvcrt.dll", "__libm_sse2_atan" } },
+    { 0x7C4B3F2C, { "msvcrt.dll", "__libm_sse2_atan2" } },
+    { 0x7C4B3F30, { "msvcrt.dll", "__libm_sse2_atanf" } },
+    { 0x7C4B3F34, { "msvcrt.dll", "__libm_sse2_cosf" } },
+    { 0x7C4B3F38, { "msvcrt.dll", "__libm_sse2_powf" } },
+    { 0x7C4B3F3C, { "msvcrt.dll", "__libm_sse2_sinf" } },
+    { 0x7C4B3F40, { "msvcrt.dll", "memcpy" } },
+    { 0x7C4B3F44, { "msvcrt.dll", "toupper" } },
 
-	// ntdll.dll, 100% restored
-	{ 0x7C4B3F4C, { "ntdll.dll", "RtlLeaveCriticalSection" } },
-	{ 0x7C4B3F50, { "ntdll.dll", "RtlEnterCriticalSection" } },
-	{ 0x7C4B3F54, { "ntdll.dll", "NtQueryVirtualMemory" } },
-	//{ 0x7C4B3F58, { "ntdll.dll", "NtTerminateProcess" } }, // commented out for debugging reasons
-	{ 0x7C4B3F5C, { "ntdll.dll", "NtReadFile" } },
-	{ 0x7C4B3F60, { "ntdll.dll", "NtDeleteFile" } },
-	{ 0x7C4B3F64, { "ntdll.dll", "NtClose" } },
-	{ 0x7C4B3F68, { "ntdll.dll", "NtCreateFile" } },
-	{ 0x7C4B3F6C, { "ntdll.dll", "RtlInitUnicodeString" } },
-	{ 0x7C4B3F70, { "ntdll.dll", "NtWriteFile" } },
-	{ 0x7C4B3F74, { "ntdll.dll", "RtlFreeHeap" } },
-	{ 0x7C4B3F78, { "ntdll.dll", "NtDelayExecution" } },
-	{ 0x7C4B3F7C, { "ntdll.dll", "RtlAllocateHeap" } },
+    { 0x7C4B3F4C, { "ntdll.dll", "RtlLeaveCriticalSection" } },
+    { 0x7C4B3F50, { "ntdll.dll", "RtlEnterCriticalSection" } },
+    { 0x7C4B3F54, { "ntdll.dll", "NtQueryVirtualMemory" } },
+    { 0x7C4B3F5C, { "ntdll.dll", "NtReadFile" } },
+    { 0x7C4B3F60, { "ntdll.dll", "NtDeleteFile" } },
+    { 0x7C4B3F64, { "ntdll.dll", "NtClose" } },
+    { 0x7C4B3F68, { "ntdll.dll", "NtCreateFile" } },
+    { 0x7C4B3F6C, { "ntdll.dll", "RtlInitUnicodeString" } },
+    { 0x7C4B3F70, { "ntdll.dll", "NtWriteFile" } },
+    { 0x7C4B3F74, { "ntdll.dll", "RtlFreeHeap" } },
+    { 0x7C4B3F78, { "ntdll.dll", "NtDelayExecution" } },
+    { 0x7C4B3F7C, { "ntdll.dll", "RtlAllocateHeap" } },
 };
 
 std::unordered_map<DWORD, std::pair<const char*, const char*>> interfaces = {
-	{ 0x43AFF050, { "engine.dll", "VEngineClient" } },
-	{ 0x43AFF01C, { "engine.dll", "EngineTraceClient" } },
-	{ 0x43AFF04C, { "engine.dll", "VModelInfoClient0" } },
-	{ 0x43AFF088, { "engine.dll", "VDebugOverlay" } },
-	{ 0x43AFF094, { "client.dll", "VClient" } },
-	{ 0x43AFEFDC, { "client.dll", "VClientEntityList" } },
-	{ 0x43AFF0A8, { "client.dll", "VClientPrediction0" } },
-	{ 0x43AFF0AC, { "client.dll", "GameMovement0" } },
-	{ 0x43AFF000, { "materialsystem.dll", "VMaterialSystem" } },
-	{ 0x43AFF098, { "vguimatsurface.dll", "VGUI_Surface" } },
-	{ 0x43AFF028, { "vphysics.dll", "VPhysicsSurfaceProps" } },
-	{ 0x43AFF030, { "vstdlib.dll", "RandomFloat" } },
-	{ 0x43AFF054, { "vstdlib.dll", "RandomInt" } },
-	{ 0x43AFF03C, { "vstdlib.dll", "RandomSeed" } },
-	{ 0x43AFF044, { "vstdlib.dll", "VEngineCvar" } },
-	{ 0x43AFF048, { "localize.dll", "Localize_" } },
-	{ 0x43AFF0B0, { "datacache.dll", "MDLCache" } },
+    { 0x43AFF050, { "engine.dll", "VEngineClient" } },
+    { 0x43AFF01C, { "engine.dll", "EngineTraceClient" } },
+    { 0x43AFF04C, { "engine.dll", "VModelInfoClient0" } },
+    { 0x43AFF088, { "engine.dll", "VDebugOverlay" } },
+    { 0x43AFF094, { "client.dll", "VClient" } },
+    { 0x43AFEFDC, { "client.dll", "VClientEntityList" } },
+    { 0x43AFF0A8, { "client.dll", "VClientPrediction0" } },
+    { 0x43AFF0AC, { "client.dll", "GameMovement0" } },
+    { 0x43AFF000, { "materialsystem.dll", "VMaterialSystem" } },
+    { 0x43AFF098, { "vguimatsurface.dll", "VGUI_Surface" } },
+    { 0x43AFF028, { "vphysics.dll", "VPhysicsSurfaceProps" } },
+    { 0x43AFF030, { "vstdlib.dll", "RandomFloat" } },
+    { 0x43AFF054, { "vstdlib.dll", "RandomInt" } },
+    { 0x43AFF03C, { "vstdlib.dll", "RandomSeed" } },
+    { 0x43AFF044, { "vstdlib.dll", "VEngineCvar" } },
+    { 0x43AFF048, { "localize.dll", "Localize_" } },
+    { 0x43AFF0B0, { "datacache.dll", "MDLCache" } },
 };
 
 std::unordered_map<DWORD, std::pair<const char*, const char*>> patterns = {
-	{ 0x43AFF0F0, { "client.dll", "55 8B EC 83 E4 F8 51 53 56 8B D9 8B 0D" } }, // WriteUserCmd
-	{ 0x43AFF0F4, { "vguimatsurface.dll", "8B 0D ? ? ? ? 56 C6 05" } },// Surface__FinishDrawing
-	{ 0x43AFF0F8, { "vguimatsurface.dll", "55 8B EC 83 E4 ? 83 EC ? 80 3D" } },// Surface__StartDrawing
-	{ 0x43AFF040, { "client.dll", "55 8B EC 51 56 8B F1 85 F6 74 68 83 BE" } },// IsBreakableEntity
+    { 0x43AFF0F0, { "client.dll", "55 8B EC 83 E4 F8 51 53 56 8B D9 8B 0D" } },
+    { 0x43AFF0F4, { "vguimatsurface.dll", "8B 0D ? ? ? ? 56 C6 05" } },
+    { 0x43AFF0F8, { "vguimatsurface.dll", "55 8B EC 83 E4 ? 83 EC ? 80 3D" } },
+    { 0x43AFF040, { "client.dll", "55 8B EC 51 56 8B F1 85 F6 74 68 83 BE" } },
 #ifndef CSGO2018
-	{ 0x43AFEF3C, { "client.dll", "66 3B 0D ? ? ? ? 72" } }, // GetFileWeaponInfoFromHandle
-	{ 0x43AFEFA0, { "client.dll", "55 8B EC 51 8B C1 53 56 8B 75" } }, // FindHudElement
-	{ 0x43AFEFD8, { "client.dll", "55 8B EC 83 E4 ? 83 EC ? 6A ? 8D 44 24" } }, // MD5_PseudoRandom
-	{ 0x43AFEFC4, { "client.dll", "A1 ? ? ? ? A8 ? 75 ? 0F 57 C0 C7 05 ? ? ? ? 00 00 00 00 F3 0F 7F 05 ? ? ? ? 83 C8 ? C7 05 ? ? ? ? 00 00 00 00 66 0F 6F 05 ? ? ? ? 68 ? ? ? ? A3 ? ? ? ? F3 0F 7F 05 ? ? ? ? C7 05 ? ? ? ? 00 00 00 00 E8 ? ? ? ? 83 C4 ? B8" } }, // GetGlowObjectManager
+    { 0x43AFEF3C, { "client.dll", "66 3B 0D ? ? ? ? 72" } },
+    { 0x43AFEFA0, { "client.dll", "55 8B EC 51 8B C1 53 56 8B 75" } },
+    { 0x43AFEFD8, { "client.dll", "55 8B EC 83 E4 ? 83 EC ? 6A ? 8D 44 24" } },
+    { 0x43AFEFC4, { "client.dll", "A1 ? ? ? ? A8 ? 75 ? 0F 57 C0 C7 05 ? ? ? ? 00 00 00 00 F3 0F 7F 05 ? ? ? ? 83 C8 ? C7 05 ? ? ? ? 00 00 00 00 66 0F 6F 05 ? ? ? ? 68 ? ? ? ? A3 ? ? ? ? F3 0F 7F 05 ? ? ? ? C7 05 ? ? ? ? 00 00 00 00 E8 ? ? ? ? 83 C4 ? B8" } },
 #else
-	{ 0x43AFEF3C, { "client.dll", "55 8B EC 81 EC ? ? ? ? 53 8B D9 56 57 8D 8B ? ? ? ? 85 C9 75 04 33 FF EB 2F" } }, // GetCSWpnData
-	{ 0x43AFEFA0, { "client.dll", "55 8B EC 53 8B 5D ? 56 57 8B F9 33 F6 39 77 ? 7E ? 8B 47 ? ? ? ? ? ? FF 50" } }, // FindHudElement
-	{ 0x43AFEFD8, { "client.dll", "55 8B EC 83 E4 ? 83 EC ? 6A ? 8D 44 24 ? 89 4C 24" } }, // MD5_PseudoRandom
-	{ 0x43AFEFC4, { "client.dll", "A1 ? ? ? ? A8 01 75 4B" } }, // GetGlowObjectManager
+    { 0x43AFEF3C, { "client.dll", "55 8B EC 81 EC ? ? ? ? 53 8B D9 56 57 8D 8B ? ? ? ? 85 C9 75 04 33 FF EB 2F" } },
+    { 0x43AFEFA0, { "client.dll", "55 8B EC 53 8B 5D ? 56 57 8B F9 33 F6 39 77 ? 7E ? 8B 47 ? ? ? ? ? ? FF 50" } },
+    { 0x43AFEFD8, { "client.dll", "55 8B EC 83 E4 ? 83 EC ? 6A ? 8D 44 24 ? 89 4C 24" } },
+    { 0x43AFEFC4, { "client.dll", "A1 ? ? ? ? A8 01 75 4B" } },
 #endif
-	{ 0x43AFF034, { "client.dll", "53 8B DC 83 EC 08 83 E4 F0 83 C4 04 55 8B 6B 04 89 6C 24 04 8B EC 81 EC ? ? ? ? 8B 43 10" } }, // ClipTraceToPlayers
+    { 0x43AFF034, { "client.dll", "53 8B DC 83 EC 08 83 E4 F0 83 C4 04 55 8B 6B 04 89 6C 24 04 8B EC 81 EC ? ? ? ? 8B 43 10" } },
 };
 
 std::unordered_map<DWORD, std::pair<const char*, bool>> convars = {
-	{ 0x43AFEFE4, { "m_yaw", false } },
-	{ 0x43AFEFEC, { "m_pitch", false } },
-	{ 0x43AFEFD4, { "sensitivity", false } },
-	{ 0x43AFEFF0, { "sv_cheats", false } },
-	{ 0x43AFEFF8, { "sv_footsteps", false } },
-	{ 0x43AFF008, { "cl_modelfastpath", false } },
-	{ 0x43AFF02C, { "weapon_recoil_scale", false } },
-	{ 0x43AFF07C, { "sv_gravity", false } },
-	{ 0x43AFF09C, { "cl_interpolate", false } },
-	{ 0x43AFF0B8, { "view_recoil_tracking", false } },
-	{ 0x43AFF05C, { "sv_maxupdaterate", false } },
-	{ 0x43AFF060, { "cl_interp", false } },
-	{ 0x43AFF064, { "sv_minupdaterate", false } },
-	{ 0x43AFF068, { "cl_interp_ratio", false } },
-	{ 0x43AFF070, { "sv_client_max_interp_ratio", false } },
-	{ 0x43AFF074, { "cl_updaterate", false } },
-	{ 0x43AFF078, { "sv_client_min_interp_ratio", false } },
-	{ 0x43AFF080, { "molotov_throw_detonate_time", false } },
-	{ 0x43AFF084, { "weapon_molotov_maxdetonateslope", false } },
-	{ 0x43AFF00C, { "name", false } },
-	{ 0x43AFEFE0, { "r_3dsky", false } },
-	{ 0x43AFF010, { "r_drawskybox", false } },
-	{ 0x43AFF014, { "gl_clear", false } },
-
-	// commands
-	{ 0x43AFF058, { "cl_fullupdate", true } },
+    { 0x43AFEFE4, { "m_yaw", false } },
+    { 0x43AFEFEC, { "m_pitch", false } },
+    { 0x43AFEFD4, { "sensitivity", false } },
+    { 0x43AFEFF0, { "sv_cheats", false } },
+    { 0x43AFEFF8, { "sv_footsteps", false } },
+    { 0x43AFF008, { "cl_modelfastpath", false } },
+    { 0x43AFF02C, { "weapon_recoil_scale", false } },
+    { 0x43AFF07C, { "sv_gravity", false } },
+    { 0x43AFF09C, { "cl_interpolate", false } },
+    { 0x43AFF0B8, { "view_recoil_tracking", false } },
+    { 0x43AFF05C, { "sv_maxupdaterate", false } },
+    { 0x43AFF060, { "cl_interp", false } },
+    { 0x43AFF064, { "sv_minupdaterate", false } },
+    { 0x43AFF068, { "cl_interp_ratio", false } },
+    { 0x43AFF070, { "sv_client_max_interp_ratio", false } },
+    { 0x43AFF074, { "cl_updaterate", false } },
+    { 0x43AFF078, { "sv_client_min_interp_ratio", false } },
+    { 0x43AFF080, { "molotov_throw_detonate_time", false } },
+    { 0x43AFF084, { "weapon_molotov_maxdetonateslope", false } },
+    { 0x43AFF00C, { "name", false } },
+    { 0x43AFEFE0, { "r_3dsky", false } },
+    { 0x43AFF010, { "r_drawskybox", false } },
+    { 0x43AFF014, { "gl_clear", false } },
+    { 0x43AFF058, { "cl_fullupdate", true } },
 };
 
 std::vector<DWORD> xor_patches = {
-	// PrepareConfigSave
-	0x34E1EAAD, 0x34E1EB16, 0x34E1EB86,
-
-	// DrawESP
-	0x34E1FE4A, 0x34E20169, 0x34E208A5, 0x34E20995, 
-	0x34E20A8A, 0x34E20BC6, 0x34E20D55, 0x34E20E2F, 
-
-	0x34E1DFC9, // GloveChanger
-	0x34E1E2DA, 0x34E1E32A, 0x34E1E38E, // PaintkitChanger
-
-	0x34E1F14E, 0x34E1F190, 0x34E1F1D0, // FillSkins
-
-	0x34E239C7, // SomethingEsp
-	0x34E1F584, // SomethingEsp2
-	0x34E1F26A, 0x34E1F2B5, 0x34E1F2F8, // SomethingEsp3
-	0x34E1F002, 0x34E1F045, 0x34E1F088, // SomethingEsp4
-	0x34E1F26A, 0x34E1F2B5, 0x34E1F2F8, // SomethingEsp5
-
-	0x34E25A13, // hkDrawModel
-
-	0x34E2AD02, // ChatSpam
-	0x34E2AC29, // Namespam
-
-	0x34E30DE4, // RenderWeapons
-
-	0x34E2B4BB, // SomethingCfg
-
-	0x34E31D7B, // GetRadarHudElement
-	0x34E30FE4, // CreateFonts
-
-	0x34E37D73, 0x34E3791E, // DrawMenuHeader
-
-	0x34E38185, 0x34E3828B, 0x34E382D3, // DrawKeybind
-	0x34E388A4, 0x34E389AF, 0x34E38A52, // DrawCombobox
-
-	0x34E38FB2, // DrawTabBar
-	0x34E39396, // DrawButton
-	0x34E372C5, // DrawCheckbox
-	0x34E37074, // DrawSlider
-	0x34E36CC5, // SliderFmt
-	0x34E36C45, // SliderFmt2
-	0x34E36BC5, // SliderFmt3
-	0x34E36B45, // SliderFmt4
-	
-	0x34E35983, // GetConfigList
-	0x34E357C5, // DumpConfig
-	0x34E34746, // ConfigAction
-
-	// Something
-	0x34E37EEF, // 0
-	0x34E3837E, // 1
-	0x34E38C48, // 2
-	0x34E394BF, // 3
-	0x34E39C5B, // 4
-	0x34E3783F, // 5
-	0x34E3774E, // 6
-	0x34E36A6F, // 7
-	0x34E3640E, // 8
-	0x34E35028, 0x34E350C1, // 9
-	0x34E34D58, // 10
-	0x34E34C1A, 0x34E34C4C, // 11
-	0x34E343AA, 0x34E34464, // 12
-	0x34E2B347, // 13
-	0x34E2B2EA, // 14
-
-	0x34E2B473, // ConfigList parser
+    0x34E1EAAD, 0x34E1EB16, 0x34E1EB86,
+    0x34E1FE4A, 0x34E20169, 0x34E208A5, 0x34E20995,
+    0x34E20A8A, 0x34E20BC6, 0x34E20D55, 0x34E20E2F,
+    0x34E1DFC9, 0x34E1E2DA, 0x34E1E32A, 0x34E1E38E,
+    0x34E1F14E, 0x34E1F190, 0x34E1F1D0,
+    0x34E239C7, 0x34E1F584,
+    0x34E1F26A, 0x34E1F2B5, 0x34E1F2F8,
+    0x34E1F002, 0x34E1F045, 0x34E1F088,
+    0x34E25A13,
+    0x34E2AD02, 0x34E2AC29,
+    0x34E30DE4, 0x34E2B4BB,
+    0x34E31D7B, 0x34E30FE4,
+    0x34E37D73, 0x34E3791E,
+    0x34E38185, 0x34E3828B, 0x34E382D3,
+    0x34E388A4, 0x34E389AF, 0x34E38A52,
+    0x34E38FB2, 0x34E39396,
+    0x34E372C5, 0x34E37074,
+    0x34E36CC5, 0x34E36C45, 0x34E36BC5, 0x34E36B45,
+    0x34E35983, 0x34E357C5, 0x34E34746,
+    0x34E37EEF, 0x34E3837E, 0x34E38C48, 0x34E394BF, 0x34E39C5B,
+    0x34E3783F, 0x34E3774E, 0x34E36A6F, 0x34E3640E,
+    0x34E35028, 0x34E350C1, 0x34E34D58,
+    0x34E34C1A, 0x34E34C4C, 0x34E343AA, 0x34E34464,
+    0x34E2B347, 0x34E2B2EA, 0x34E2B473,
 };
 
-#define log(x) std::cout << x << std::endl;
+// ===================== Implementation =====================
 
-AwRender* render = nullptr;
-AwGlobals* global_ctx = nullptr;
-AwSkinChangerData* skinchanger_ctx = nullptr;
+namespace Aimware {
 
-void* engine_vgui = nullptr;
-vmthook* engine_vgui_hook = nullptr;
+bool InitializeMemoryDumps() {
+    LOG_INFO("Initializing memory dumps...");
 
-IBaseClientDLL* client = nullptr;
-vmthook* client_hook = nullptr;
+    auto& mem = MemoryManager::Instance();
 
-void* client_mode = nullptr;
-vmthook* client_mode_hook = nullptr;
+    if (!mem.AllocateFixed(0x7C4A0000, sizeof(b7C4A0000), "CRT Helper", b7C4A0000)) {
+        LOG_ERROR("Failed to allocate b7C4A0000");
+        return false;
+    }
 
-void* prediction = nullptr;
-vmthook* prediction_hook = nullptr;
+    if (!mem.AllocateFixed(0x76ED0000, sizeof(b76ED0000), "String Resources", b76ED0000)) {
+        LOG_ERROR("Failed to allocate b76ED0000");
+        return false;
+    }
 
-void* surface = nullptr;
-vmthook* surface_hook = nullptr;
+    if (!mem.AllocateFixed(0x43AF0000, sizeof(b43AF0000), "Data Section", b43AF0000)) {
+        LOG_ERROR("Failed to allocate b43AF0000");
+        return false;
+    }
 
-void* trace = nullptr;
-vmthook* trace_hook = nullptr;
+    if (!mem.AllocateFixed(0x34E10000, sizeof(b34E10000), "Code Section", b34E10000)) {
+        LOG_ERROR("Failed to allocate b34E10000");
+        return false;
+    }
 
-void* studio_render = nullptr;
-vmthook* studio_render_hook = nullptr;
-
-void* view_render = nullptr;
-vmthook* view_render_hook = nullptr;
-
-void* fire_bullets = nullptr;
-vmthook* fire_bullets_hook = nullptr;
-
-ICvar* cvars = nullptr;
-
-HWND window; 
-WNDPROC orig_wndproc;
-
-netvars _netvars;
-
-std::vector<std::pair<uintptr_t, uintptr_t>> hooked_netvars;
-
-void hook_netvar(const char* table, const char* var, uintptr_t original_addr, uintptr_t hook_fn)
-{
-	RecvProp* prop = nullptr;
-	_netvars.get_prop(table, var, &prop);
-
-	if (!prop)
-	{
-		log("netvar " << table << "::" << var << " not found");
-		return;
-	}
-
-	hooked_netvars.push_back({ (uintptr_t)prop->proxy, (uintptr_t)prop });
-
-	if (original_addr)
-		*(void**)original_addr = prop->proxy;
-	prop->proxy = (recvProxy)hook_fn;
+    LOG_SUCCESS("All dumps allocated");
+    return true;
 }
 
-void unhook_netvars()
-{
-	for (auto& netvar : hooked_netvars)
-	{
-		((RecvProp*)netvar.second)->proxy = (recvProxy)netvar.first;
-	}
+void FixImports() {
+    LOG_INFO("Fixing imports (%zu entries)...", imports.size());
 
-	hooked_netvars.clear();
+    int fixed = 0, failed = 0;
+    for (auto& [addr, modFunc] : imports) {
+        HMODULE mod = LoadLibraryA(modFunc.first);
+        if (!mod) {
+            mod = GetModuleHandleA(modFunc.first);
+            if (!mod) {
+                LOG_WARN("Module %s not found", modFunc.first);
+                failed++;
+                continue;
+            }
+        }
+
+        FARPROC proc = GetProcAddress(mod, modFunc.second);
+        if (!proc) {
+            LOG_WARN("Import %s::%s not found", modFunc.first, modFunc.second);
+            failed++;
+            continue;
+        }
+
+        *(FARPROC*)addr = proc;
+        fixed++;
+    }
+
+    LOG_SUCCESS("Imports fixed: %d ok, %d failed", fixed, failed);
 }
 
-void init_aw_ptrs()
-{
-	render = *(AwRender**)(0x43B01224); // actual addr is 43AF7DAC btw
-	global_ctx = *(AwGlobals**)(0x43AF7704); // actual addr is 43AF7DC8 btw
-	skinchanger_ctx = *(AwSkinChangerData**)(0x43AF7700); // actual addr is 43B01228 btw
+void FixAddresses() {
+    LOG_INFO("Fixing addresses (%zu patterns)...", patterns.size());
+
+    for (auto& [addr, modPat] : patterns) {
+        uintptr_t found = PatternScanner::FindOrZero(modPat.first, modPat.second);
+        if (!found) {
+            LOG_WARN("Pattern not found: %s [%s]", modPat.first, modPat.second);
+            continue;
+        }
+        *(uintptr_t*)addr = found;
+        LOG_INFO("Pattern %s -> 0x%08X at 0x%08X", modPat.first, found, addr);
+    }
+
+    // Additional fixes
+    auto findAndSet = [](DWORD targetAddr, const char* mod, const char* pat, int offset = 0) {
+        uintptr_t found = PatternScanner::FindOrZero(mod, pat);
+        if (found) {
+            DWORD value = *(DWORD*)(found + offset);
+            // If pattern points to instruction with immediate, extract
+            // For simplicity, handle common case where we need to read dword at +1 or +2
+            if (targetAddr) {
+                // Special handling per address
+            }
+        }
+    };
+
+    // pHud
+    uintptr_t pHudSig = PatternScanner::FindOrZero("client.dll", "B9 ? ? ? ? 56 68 ? ? ? ? 89 45");
+    if (pHudSig) {
+        *(PDWORD)0x43AFEFA4 = *(PDWORD)(pHudSig + 1);
+        LOG_INFO("pHud fixed: 0x%08X", *(PDWORD)0x43AFEFA4);
+    }
+
+    // PredictionRandomSeed
+    uintptr_t predSeed = PatternScanner::FindOrZero("client.dll", "8B 0D ? ? ? ? BA ? ? ? ? E8 ? ? ? ? 83 C4 04");
+    if (predSeed) {
+        *(PDWORD)0x43AFEE5C = *(DWORD*)(predSeed + 2);
+        LOG_INFO("PredictionRandomSeed fixed");
+    }
+
+    // SmokeCount
+    uintptr_t smokeCount = PatternScanner::FindOrZero("client.dll", "A3 ? ? ? ? 57 8B CB");
+    if (smokeCount) {
+        *(PDWORD)0x43AFF0B4 = *(DWORD*)(smokeCount + 1);
+        LOG_INFO("SmokeCount fixed: 0x%08X", *(PDWORD)0x43AFF0B4);
+    }
+
+    // Name spam
+    uintptr_t nameSpam = PatternScanner::FindOrZero("engine.dll", "38 05 ? ? ? ? 75 ? 8B CE C6 05 ? ? ? ? ? E8 ? ? ? ? C6 05 ? ? ? ? 00");
+    if (nameSpam) {
+        *(PDWORD)0x43AFF004 = *(DWORD*)(nameSpam + 2);
+    }
+
+    // CInput offsets
+    DWORD inputBase = *(PDWORD)0x43AFF06C;
+    if (inputBase) {
+        *(PDWORD)0x43AFEF4C = inputBase + 0xA8;
+        *(PDWORD)0x43AFEF54 = inputBase + 0xA5;
+    }
+
+    // Trace filters
+    uintptr_t traceSimple = PatternScanner::FindOrZero("client.dll", "C7 45 ? ? ? ? ? C7 45 ? 00 00 00 00 FF 50 ? A1");
+    if (traceSimple) {
+        *(PDWORD)0x43AFF0FC = *(DWORD*)(traceSimple + 3);
+    }
+
+    uintptr_t traceSkipTwo = PatternScanner::FindOrZero("client.dll", "C7 44 24 ? ? ? ? ? FF 90 ? ? ? ? 8D 44 24 ? 50 8D 44 24 ? 50 68 ? ? ? ? 8B 55");
+    if (traceSkipTwo) {
+        *(PDWORD)0x43AFF100 = *(DWORD*)(traceSkipTwo + 4);
+    }
+
+    LOG_SUCCESS("Address fixing complete");
 }
 
-void fix_imports()
-{
-	for (auto& import : imports)
-	{
-		HMODULE module = LoadLibraryA(import.second.first);
-		if (!module)
-		{
-			log("module " << import.second.first << " not found");
-			continue;
-		}
+void FixConvars() {
+    LOG_INFO("Fixing convars (%zu entries)...", convars.size());
 
-		FARPROC procedure = GetProcAddress(module, import.second.second);
-		if (!procedure)
-		{
-			log("import " << import.second.first << "::" << import.second.second << " not found");
-			continue;
-		}
+    auto& state = GlobalState::Instance();
+    if (!state.cvars) {
+        state.cvars = GetInterface<ICvar>("vstdlib.dll", "VEngineCvar");
+    }
 
-		*(FARPROC*)import.first = procedure;
-	}
+    if (!state.cvars) {
+        LOG_ERROR("ICvar interface not found");
+        return;
+    }
+
+    int fixed = 0;
+    for (auto& [addr, nameIsCmd] : convars) {
+        void* cvar_ptr = nameIsCmd.second ?
+            (void*)state.cvars->FindCommand(nameIsCmd.first) :
+            (void*)state.cvars->FindVar(nameIsCmd.first);
+
+        if (!cvar_ptr) {
+            LOG_WARN("Cvar %s not found", nameIsCmd.first);
+            continue;
+        }
+
+        *(void**)addr = cvar_ptr;
+        fixed++;
+    }
+
+    LOG_SUCCESS("Convars fixed: %d/%zu", fixed, convars.size());
 }
 
-void fix_addresses()
-{
-	for (auto& pattern : patterns)
-	{
-		uintptr_t pat = find_signature(pattern.second.first, pattern.second.second);
-		if (!pat)
-		{
-			log("pattern \"" << pattern.second.second << "\" not found");
-			continue;
-		}
+bool InitializeInterfaces() {
+    LOG_INFO("Initializing interfaces (%zu entries)...", interfaces.size());
 
-		*(uintptr_t*)pattern.first = pat;
-	}
+    auto& state = GlobalState::Instance();
+    int fixed = 0;
 
-	// pHud for FindElement
-	*(PDWORD)0x43AFEFA4 = *(PDWORD)(find_signature("client.dll", "B9 ? ? ? ? 56 68 ? ? ? ? 89 45") + 1);
+    for (auto& [addr, modName] : interfaces) {
+        void* iface = nullptr;
 
-	// PredictionRandomSeed
-	*(PDWORD)0x43AFEE5C = *(DWORD*)(find_signature("client.dll", "8B 0D ? ? ? ? BA ? ? ? ? E8 ? ? ? ? 83 C4 04") + 2);
+        if (strstr(modName.second, "Random")) {
+            HMODULE mod = GetModuleHandleA(modName.first);
+            if (mod) iface = GetProcAddress(mod, modName.second);
+        } else {
+            iface = GetInterface<void>(modName.first, modName.second);
+        }
 
-	// SmokeCount
-	*(PDWORD)0x43AFF0B4 = *(DWORD*)(find_signature("client.dll", "A3 ? ? ? ? 57 8B CB") + 1);
+        if (!iface) {
+            LOG_WARN("Interface %s::%s not found", modName.first, modName.second);
+            continue;
+        }
 
-	// Namestealer, namespam crap
-	*(PDWORD)0x43AFF004 = *(DWORD*)(find_signature("engine.dll", "38 05 ? ? ? ? 75 ? 8B CE C6 05 ? ? ? ? ? E8 ? ? ? ? C6 05 ? ? ? ? 00") + 2);
+        *(void**)addr = iface;
+        fixed++;
+    }
 
-	// CInput m_bCameraInThirdPerson and m_vecViewOffset references. Thank aw devs for that... Is it really that difficult to get them directly from Input?
-	*(PDWORD)0x43AFEF4C = ((*(PDWORD)0x43AFF06C) + 0xA8);
-	*(PDWORD)0x43AFEF54 = ((*(PDWORD)0x43AFF06C) + 0xA5);
+    // Resolve additional interfaces
+    state.client = *(IBaseClientDLL**)(0x43AFF094);
+    if (!state.client) {
+        LOG_ERROR("Client interface null");
+        return false;
+    }
 
-	// Get rid of stupid TraceRay and ClipTraceToPlayers hooks...
-	*(PDWORD)0x43AFF0FC = *(DWORD*)(find_signature("client.dll", "C7 45 ? ? ? ? ? C7 45 ? 00 00 00 00 FF 50 ? A1") + 3); // CTraceFilterSimple_vtable
-	*(PDWORD)0x43AFF100 = *(DWORD*)(find_signature("client.dll", "C7 44 24 ? ? ? ? ? FF 90 ? ? ? ? 8D 44 24 ? 50 8D 44 24 ? 50 68 ? ? ? ? 8B 55") + 4); // CTraceFilterSkipTwoEntities_vtable
-}
+    // ClientMode - from client vtable[10] + 5
+    try {
+        state.client_mode = **(void***)((*(DWORD**)state.client)[10] + 0x5);
+        LOG_INFO("ClientMode: 0x%p", state.client_mode);
+    } catch (...) {
+        LOG_ERROR("Failed to get ClientMode");
+    }
 
-void fix_cvars()
-{
-	cvars = get_interface<ICvar>("vstdlib.dll", "VEngineCvar");
-	for (auto cvar : convars)
-	{
-		void* cvar_ptr = cvar.second.second ? (void*)cvars->FindCommand(cvar.second.first) : (void*)cvars->FindVar(cvar.second.first);
-		if (!cvar_ptr)
-		{
-			log("cvar \"" << cvar.second.first << "\" not found");
-			continue;
-		}
+    state.prediction = *(void**)(0x43AFF0A8);
+    state.surface = *(void**)(0x43AFF098);
+    state.trace = *(void**)(0x43AFF01C);
 
-		*(void**)cvar.first = cvar_ptr;
-	}
-}
-
-void init_interfaces()
-{
-	for (auto& interface_ : interfaces)
-	{
-		void* interface_ptr = strstr(interface_.second.second, "Random") ? GetProcAddress(GetModuleHandleA(interface_.second.first), interface_.second.second) : get_interface<void>(interface_.second.first, interface_.second.second);
-		if (!interface_ptr)
-		{
-			log("interface \"" << interface_.second.second << "\" not found");
-			continue;
-		}
-
-		*(void**)interface_.first = interface_ptr;
-	}
-
-	client = *(IBaseClientDLL**)(0x43AFF094);
-	client_mode = **(void***)((*(DWORD**)client)[10] + 0x5);
-	prediction = *(void**)(0x43AFF0A8);
-	surface = *(void**)(0x43AFF098);
-	trace = *(void**)(0x43AFF01C);
-
+    // GlobalVarsBase
+    try {
 #ifndef CSGO2018
-	*(PDWORD)0x43AFF020 = **(DWORD**)((*(DWORD**)(client))[0] + 0x53); // CGlobalVarsBase
+        *(PDWORD)0x43AFF020 = **(DWORD**)((*(DWORD**)(state.client))[0] + 0x53);
 #else
-	*(PDWORD)0x43AFF020 = **(DWORD**)((*(DWORD**)(client))[0] + 0x1B); // CGlobalVarsBase
+        *(PDWORD)0x43AFF020 = **(DWORD**)((*(DWORD**)(state.client))[0] + 0x1B);
 #endif
-	*(PDWORD)0x43AFF06C = *reinterpret_cast<DWORD*>((*reinterpret_cast<uintptr_t**>(client))[15] + 0x1); // CInput
-	*(PDWORD)0x43AFEFE8 = **(DWORD**)(find_signature("client.dll", "8B 0D ? ? ? ? 8B 46 08 68") + 0x2); // MoveHelper
+        LOG_INFO("GlobalVarsBase fixed");
+    } catch (...) {
+        LOG_ERROR("Failed to fix GlobalVarsBase");
+    }
 
-	*(PDWORD)0x43AFEFD0 = (DWORD)reinterpret_cast<CCStrike15ItemSystem*(*)()>(find_signature("client.dll", "A1 ? ? ? ? 85 C0 75 ? A1 ? ? ? ? 56 68"))(); // ItemSystem
+    // CInput
+    try {
+        *(PDWORD)0x43AFF06C = *reinterpret_cast<DWORD*>((*reinterpret_cast<uintptr_t**>(state.client))[15] + 0x1);
+        LOG_INFO("CInput fixed: 0x%08X", *(PDWORD)0x43AFF06C);
+    } catch (...) {
+        LOG_ERROR("Failed to fix CInput");
+    }
+
+    // MoveHelper
+    uintptr_t moveHelperSig = PatternScanner::FindOrZero("client.dll", "8B 0D ? ? ? ? 8B 46 08 68");
+    if (moveHelperSig) {
+        *(PDWORD)0x43AFEFE8 = **(DWORD**)(moveHelperSig + 0x2);
+        LOG_INFO("MoveHelper fixed");
+    }
+
+    // ItemSystem
+    uintptr_t itemSystemSig = PatternScanner::FindOrZero("client.dll", "A1 ? ? ? ? 85 C0 75 ? A1 ? ? ? ? 56 68");
+    if (itemSystemSig) {
+        auto getItemSystem = reinterpret_cast<CCStrike15ItemSystem*(*)()>(itemSystemSig);
+        *(PDWORD)0x43AFEFD0 = (DWORD)getItemSystem();
+        LOG_INFO("ItemSystem fixed: 0x%08X", *(PDWORD)0x43AFEFD0);
+    }
+
+    // Local interfaces for hooking
+    state.engine_vgui = GetInterface<void>("engine.dll", "VEngineVGui0");
+    if (state.engine_vgui) {
+        state.engine_vgui_hook = std::make_unique<VMTHook>((void**)state.engine_vgui);
+        state.engine_vgui_hook->Initialize((void**)state.engine_vgui);
+    }
+
+    void* studio_render = GetInterface<void>("studiorender.dll", "VStudioRender");
+    if (studio_render) {
+        state.studio_render = studio_render;
+        state.studio_render_hook = std::make_unique<VMTHook>((void**)studio_render);
+        state.studio_render_hook->Initialize((void**)studio_render);
+    }
+
+    state.client_hook = std::make_unique<VMTHook>((void**)state.client);
+    state.client_hook->Initialize((void**)state.client);
+
+    if (state.client_mode) {
+        state.client_mode_hook = std::make_unique<VMTHook>((void**)state.client_mode);
+        state.client_mode_hook->Initialize((void**)state.client_mode);
+    }
+
+    if (state.prediction) {
+        state.prediction_hook = std::make_unique<VMTHook>((void**)state.prediction);
+        state.prediction_hook->Initialize((void**)state.prediction);
+    }
+
+    if (state.surface) {
+        state.surface_hook = std::make_unique<VMTHook>((void**)state.surface);
+        state.surface_hook->Initialize((void**)state.surface);
+    }
+
+    if (state.trace) {
+        state.trace_hook = std::make_unique<VMTHook>((void**)state.trace);
+        state.trace_hook->Initialize((void**)state.trace);
+    }
+
+    LOG_SUCCESS("Interfaces initialized: %d/%zu", fixed, interfaces.size());
+    return fixed > 0;
 }
+
+bool InitializeNetvars() {
+    LOG_INFO("Initializing netvars...");
+
+    auto& state = GlobalState::Instance();
+    if (!state.client) {
+        LOG_ERROR("Client null for netvar init");
+        return false;
+    }
+
+    bool result = state.netvars.Initialize(state.client);
+    if (!result) {
+        LOG_ERROR("NetvarManager init failed");
+        return false;
+    }
+
+    LOG_SUCCESS("Netvars initialized: %zu tables", state.netvars.tables.size());
+    return true;
+}
+
+void FixPostOEP() {
+    LOG_INFO("Fixing post-OEP crap...");
+
+    auto& state = GlobalState::Instance();
+    auto& mem = MemoryManager::Instance();
+
+    // Fix render
+    AwRender* render = *(AwRender**)(0x43B01224);
+    if (render) {
+        LOG_INFO("Render original res: %dx%d", render->Width, render->Height);
+        render->DidCreateFont = false;
+        render->Width = 0;
+        render->Height = 0;
+    }
+
+    // Fix XOR patches - set to JNZ (0x75)
+    LOG_INFO("Patching XOR checks (%zu)...", xor_patches.size());
+    for (auto addr : xor_patches) {
+        mem.PatchByte(addr, 0x75);
+    }
+
+    // Find window
+    HWND window = nullptr;
+    int attempts = 0;
+    while (!(window = FindWindowA("Valve001", nullptr)) && attempts < 100) {
+        Sleep(100);
+        attempts++;
+    }
+
+    if (window) {
+        state.window = window;
+        LOG_SUCCESS("Window found: 0x%p", window);
+    } else {
+        LOG_WARN("Window Valve001 not found, using foreground");
+        state.window = GetForegroundWindow();
+    }
+
+    // Reset skinchanger struct
+    AwSkinChangerData* skinCtx = *(AwSkinChangerData**)(0x43AF7700);
+    if (skinCtx) {
+        memset(skinCtx, 0, 216);
+        state.skinchanger_ctx = skinCtx;
+    }
+
+    // Fix netvar proxies
+    state.netvars.GetProp("CCSPlayer", "m_angEyeAngles[1]", (RecvProp**)0x43B01318);
+    state.netvars.GetProp("CSmokeGrenadeProjectile", "m_nSmokeEffectTickBegin", (RecvProp**)0x43B01324);
+
+    *(PDWORD)0x43AFE0C4 = (DWORD)state.netvars.GetClass("CBaseWeaponWorldModel");
+    *(PDWORD)0x43AFE0E0 = (DWORD)state.netvars.GetClass("CBaseViewModel");
+
+    // Client.dll info for pattern scanner inside cheat
+    MODULEINFO info;
+    if (GetModuleInformation(GetCurrentProcess(), GetModuleHandleA("client.dll"), &info, sizeof(info))) {
+        *(PDWORD)0x43AFF038 = (DWORD)info.lpBaseOfDll + 0x1000;
+        *(PDWORD)0x43AFF024 = info.SizeOfImage;
+        LOG_INFO("Client.dll base: 0x%p size: 0x%X", info.lpBaseOfDll, info.SizeOfImage);
+    }
+
+    // Allocate lag records
+    void* records = mem.AllocateLagRecords();
+    if (!records) {
+        LOG_ERROR("Failed to allocate lag records");
+    }
+
+    *(PDWORD)0x43AFE638 = 0; // UnlockCursor flag
+
+    // Profile context
+    struct profile_t {
+        int xor_key = 0;
+        int pad;
+        wchar_t config_path[260];
+        int pad2[64];
+    };
+
+    profile_t* profile_ = (profile_t*)mem.AllocateDynamic(sizeof(profile_t), "Profile");
+    memset(profile_, 0, sizeof(profile_t));
+    profile_->xor_key = 0;
+    memcpy(profile_->config_path, L"\\??\\C:\\aimware\\", sizeof(L"\\??\\C:\\aimware\\"));
+    *(PDWORD)0x43AFF218 = (DWORD)profile_;
+
+    CreateDirectoryA("C:\\aimware\\", 0);
+    ConfigSystem::Instance().Initialize(L"C:\\aimware\\");
+
+    // NOP out some checks in skinchanger
+    mem.NopRange(0x34E1DA71, 0x34E1DA82);
+    mem.NopRange(0x34E1DA85, 0x34E1DA8A);
+    mem.NopRange(0x34E1DA8F, 0x34E1DA94);
+    mem.NopRange(0x34E1DA9A, 0x34E1DA9D);
+    mem.NopRange(0x34E1DAA2, 0x34E1DAA5);
+    mem.NopRange(0x34E1DAA8, 0x34E1DAAD);
 
 #ifdef CSGO2018
-void fix_for_2018()
-{
-	// skinchanger fix
-	*(PDWORD)0x34E1D948 += 0x24; // 0xF0
-	*(PDWORD)0x34E1D954 += 0x24; // 0x284
-	*(PDWORD)0x34E1D960 += 0x24; // 0x218
+    // 2018 fixes - offsets
+    *(PDWORD)0x34E1D948 += 0x24;
+    *(PDWORD)0x34E1D954 += 0x24;
+    *(PDWORD)0x34E1D960 += 0x24;
+    *(PDWORD)0x34E1D989 += 0x24;
+    *(PDWORD)0x34E1DA1D += 0x24;
+    *(PDWORD)0x34E1D9A2 += 0x24;
+    *(PDWORD)0x34E1DB2F += 0x24;
+    *(PDWORD)0x34E1DB52 += 0x24;
+    *(PDWORD)0x34E1DBEA += 0x24;
+    *(PDWORD)0x34E1DC3A += 0x24;
+    *(PDWORD)0x34E1DC1B += 0x24;
+    *(PDWORD)0x34E31F0B += 0x24;
+    *(PDWORD)0x34E31F15 += 0x24;
 
-	*(PDWORD)0x34E1D989 += 0x24; // 0xF0
-	*(PDWORD)0x34E1DA1D += 0x24; // 0xF0
+    *(PDWORD)0x34E1C021 = 469 * 4;
+    *(PDWORD)0x34E1C015 = 471 * 4;
+    *(PDWORD)0x34E1BFD6 = 439 * 4;
 
-	*(PDWORD)0x34E1D9A2 += 0x24; // 0xD8
+    mem.PatchBytes(0x34E1C038, { 0x89, 0xF9, 0x90, 0x90 });
+    *(PSHORT)0x34E1C046 = 0x00C8;
+    *(PSHORT)0x34E1C052 = 0x00F0;
+    *(PSHORT)0x34E1C05E = 0x00F8;
+    *(PSHORT)0x34E1C06A = 0x00EC;
+    *(PSHORT)0x34E1C076 = 0x0104;
+    *(PSHORT)0x34E1C082 = 0x0108;
+    *(PSHORT)0x34E1C08E = 0x00F4;
+    *(PSHORT)0x34E1C09A = 0x0000;
 
-	*(PDWORD)0x34E1DB2F += 0x24; // 0x218
-	*(PDWORD)0x34E1DB52 += 0x24; // 0x200
-	*(PDWORD)0x34E1DBEA += 0x24; // 0x218
+    mem.NopRange(0x34E318C6, 0x34E318D7);
+    mem.NopRange(0x34E318DA, 0x34E318DF);
+    mem.NopRange(0x34E318E4, 0x34E31918);
 
-	*(PDWORD)0x34E1DC3A += 0x24; // 0x26C
-	*(PDWORD)0x34E1DC1B += 0x24; // 0x284
+    // Netvar fixes for 2018
+    *(PDWORD)0x43AFEF34 = 0x29BC;
+    *(PDWORD)0x43AFEFC8 = 0xA310;
+    *(PDWORD)0x43AFEFB8 = 0x32B0;
+    *(PDWORD)0x43AFEED8 = 0x3360;
+    *(PDWORD)0x43AFEEE0 = state.netvars.GetOffset("CCSPlayer", "deadflag") + 4;
+    *(PDWORD)0x43AFEEE4 = state.netvars.GetOffset("CCSPlayer", "m_nTickBase");
+    *(PDWORD)0x43AFEEA0 = state.netvars.GetOffset("CCSPlayer", "m_flNextAttack");
+    *(PDWORD)0x43AFEEB4 = state.netvars.GetOffset("CCSPlayer", "m_flPoseParameter");
+    *(PDWORD)0x43AFEEBC = state.netvars.GetOffset("CCSPlayer", "m_bClientSideAnimation");
+    *(PDWORD)0x43AFEF70 = state.netvars.GetOffset("CCSPlayer", "m_bHasHelmet");
+    *(PDWORD)0x43AFEF74 = state.netvars.GetOffset("CCSPlayer", "m_bHasDefuser");
+    *(PDWORD)0x43AFEF78 = state.netvars.GetOffset("CCSPlayer", "m_iAccount");
+    *(PDWORD)0x43AFEF7C = state.netvars.GetOffset("CCSPlayer", "m_bIsDefusing");
+    *(PDWORD)0x43AFEF80 = state.netvars.GetOffset("CCSPlayer", "m_flLowerBodyYawTarget");
+    *(PDWORD)0x43AFEF84 = state.netvars.GetOffset("CCSPlayer", "m_iShotsFired");
+    *(PDWORD)0x43AFEF88 = state.netvars.GetOffset("CCSPlayer", "m_bGunGameImmunity");
+    *(PDWORD)0x43AFEE9C = state.netvars.GetOffset("CCSPlayer", "m_aimPunchAngle");
+    *(PDWORD)0x43AFEF6C = state.netvars.GetOffset("CBasePlayer", "m_ArmorValue");
+    *(PDWORD)0x43AFEEA8 = state.netvars.GetOffset("CBaseCombatCharacter", "m_hActiveWeapon");
+    *(PDWORD)0x43AFEEAC = state.netvars.GetOffset("CBaseCombatCharacter", "m_hMyWearables");
+    *(PDWORD)0x43AFEEF4 = 0x31D8;
+    *(PDWORD)0x43AFEEF8 = state.netvars.GetOffset("CBaseCombatWeapon", "m_iItemDefinitionIndex");
+    *(PDWORD)0x43AFEEFC = state.netvars.GetOffset("CBaseCombatWeapon", "m_iClip1");
+    *(PDWORD)0x43AFEF38 = state.netvars.GetOffset("CBaseCombatWeapon", "m_iClip2");
+    *(PDWORD)0x43AFEF40 = state.netvars.GetOffset("CBaseCombatWeapon", "m_iAccountID");
+    *(PDWORD)0x43AFEF20 = state.netvars.GetOffset("CBaseCombatWeapon", "m_iViewModelIndex");
+    *(PDWORD)0x43AFEF24 = state.netvars.GetOffset("CBaseCombatWeapon", "m_iWorldModelIndex");
+    *(PDWORD)0x43AFEF30 = state.netvars.GetOffset("CBaseCombatWeapon", "m_iPrimaryReserveAmmoCount");
+    *(PDWORD)0x43AFEFB4 = state.netvars.GetOffset("CBaseCombatWeapon", "m_flPostponeFireReadyTime");
+    *(PDWORD)0x43AFEF00 = state.netvars.GetOffset("CBaseAttributableItem", "m_nFallbackStatTrak");
+    *(PDWORD)0x43AFEF04 = state.netvars.GetOffset("CBaseAttributableItem", "m_nFallbackPaintKit");
+    *(PDWORD)0x43AFEF08 = state.netvars.GetOffset("CBaseAttributableItem", "m_OriginalOwnerXuidLow");
+    *(PDWORD)0x43AFEF0C = state.netvars.GetOffset("CBaseAttributableItem", "m_bInitialized");
+    *(PDWORD)0x43AFEF10 = state.netvars.GetOffset("CBaseAttributableItem", "m_szCustomName");
+    *(PDWORD)0x43AFEF14 = state.netvars.GetOffset("CBaseAttributableItem", "m_iItemIDLow");
+    *(PDWORD)0x43AFEF28 = state.netvars.GetOffset("CBaseAttributableItem", "m_nFallbackSeed");
+    *(PDWORD)0x43AFEF2C = state.netvars.GetOffset("CBaseAttributableItem", "m_flFallbackWear");
 
-	*(PDWORD)0x34E31F0B += 0x24; // 0xF0
-	*(PDWORD)0x34E31F15 += 0x24; // 0xD8
+    uintptr_t pHud2018 = PatternScanner::FindOrZero("client.dll", "B9 ? ? ? ? 0F 94 C0 0F B6 C0 50 68");
+    if (pHud2018) *(PDWORD)0x43AFEFA4 = *(PDWORD)(pHud2018 + 1);
 
-	// getspread, etc indexes
-	*(PDWORD)0x34E1C021 = 469 * 4;
-	*(PDWORD)0x34E1C015 = 471 * 4;
-	*(PDWORD)0x34E1BFD6 = 439 * 4;
-
-	// patch for GetCSWpnData
-	*(PBYTE)0x34E1C038 = 0x89;
-	*(PBYTE)0x34E1C039 = 0xF9;
-	*(PBYTE)0x34E1C03A = 0x90;
-	*(PBYTE)0x34E1C03B = 0x90;
-
-	*(PSHORT)0x34E1C046 = 0x00C8;
-	*(PSHORT)0x34E1C052 = 0x00F0;
-	*(PSHORT)0x34E1C05E = 0x00F8;
-	*(PSHORT)0x34E1C06A = 0x00EC;
-	*(PSHORT)0x34E1C076 = 0x0104;
-	*(PSHORT)0x34E1C082 = 0x0108;
-	*(PSHORT)0x34E1C08E = 0x00F4;
-	*(PSHORT)0x34E1C09A = 0x0000;
-
-	// nop out some crap
-	for (PBYTE byte = (PBYTE)0x34E318C6; (DWORD)byte < 0x34E318D7; byte++)
-		*byte = 0x90;
-
-	for (PBYTE byte = (PBYTE)0x34E318DA; (DWORD)byte < 0x34E318DF; byte++)
-		*byte = 0x90;
-
-	for (PBYTE byte = (PBYTE)0x34E318E4; (DWORD)byte < 0x34E31918; byte++)
-		*byte = 0x90;
-
-	// fix netvars
-	*(PDWORD)0x43AFEF34 = 0x29BC;
-	*(PDWORD)0x43AFEFC8 = 0xA310;
-	*(PDWORD)0x43AFEFB8 = 0x32B0;
-	*(PDWORD)0x43AFEED8 = 0x3360;
-	*(PDWORD)0x43AFEEE0 = _netvars.get_offset("CCSPlayer", "deadflag") + 4;
-	*(PDWORD)0x43AFEEE4 = _netvars.get_offset("CCSPlayer", "m_nTickBase");
-
-	*(PDWORD)0x43AFEEA0 = _netvars.get_offset("CCSPlayer", "m_flNextAttack");
-	*(PDWORD)0x43AFEEB4 = _netvars.get_offset("CCSPlayer", "m_flPoseParameter");
-	*(PDWORD)0x43AFEEBC = _netvars.get_offset("CCSPlayer", "m_bClientSideAnimation");
-	*(PDWORD)0x43AFEF70 = _netvars.get_offset("CCSPlayer", "m_bHasHelmet");
-	*(PDWORD)0x43AFEF74 = _netvars.get_offset("CCSPlayer", "m_bHasDefuser");
-	*(PDWORD)0x43AFEF78 = _netvars.get_offset("CCSPlayer", "m_iAccount");
-	*(PDWORD)0x43AFEF7C = _netvars.get_offset("CCSPlayer", "m_bIsDefusing");
-	*(PDWORD)0x43AFEF80 = _netvars.get_offset("CCSPlayer", "m_flLowerBodyYawTarget");
-	*(PDWORD)0x43AFEF84 = _netvars.get_offset("CCSPlayer", "m_iShotsFired");
-	*(PDWORD)0x43AFEF88 = _netvars.get_offset("CCSPlayer", "m_bGunGameImmunity");
-	*(PDWORD)0x43AFEE9C = _netvars.get_offset("CCSPlayer", "m_aimPunchAngle");
-
-	*(PDWORD)0x43AFEF6C = _netvars.get_offset("CBasePlayer", "m_ArmorValue");
-
-	*(PDWORD)0x43AFEEA8 = _netvars.get_offset("CBaseCombatCharacter", "m_hActiveWeapon");
-	*(PDWORD)0x43AFEEAC = _netvars.get_offset("CBaseCombatCharacter", "m_hMyWearables");
-
-	*(PDWORD)0x43AFEEF4 = 0x31D8;
-	*(PDWORD)0x43AFEEF8 = _netvars.get_offset("CBaseCombatWeapon", "m_iItemDefinitionIndex");
-	*(PDWORD)0x43AFEEFC = _netvars.get_offset("CBaseCombatWeapon", "m_iClip1");
-	*(PDWORD)0x43AFEF38 = _netvars.get_offset("CBaseCombatWeapon", "m_iClip2");
-	*(PDWORD)0x43AFEF40 = _netvars.get_offset("CBaseCombatWeapon", "m_iAccountID");
-	*(PDWORD)0x43AFEF20 = _netvars.get_offset("CBaseCombatWeapon", "m_iViewModelIndex");
-	*(PDWORD)0x43AFEF24 = _netvars.get_offset("CBaseCombatWeapon", "m_iWorldModelIndex");
-	*(PDWORD)0x43AFEF30 = _netvars.get_offset("CBaseCombatWeapon", "m_iPrimaryReserveAmmoCount");
-	*(PDWORD)0x43AFEFB4 = _netvars.get_offset("CBaseCombatWeapon", "m_flPostponeFireReadyTime");
-
-	*(PDWORD)0x43AFEF00 = _netvars.get_offset("CBaseAttributableItem", "m_nFallbackStatTrak");
-	*(PDWORD)0x43AFEF04 = _netvars.get_offset("CBaseAttributableItem", "m_nFallbackPaintKit");
-	*(PDWORD)0x43AFEF08 = _netvars.get_offset("CBaseAttributableItem", "m_OriginalOwnerXuidLow");
-	*(PDWORD)0x43AFEF0C = _netvars.get_offset("CBaseAttributableItem", "m_bInitialized");
-	*(PDWORD)0x43AFEF10 = _netvars.get_offset("CBaseAttributableItem", "m_szCustomName");
-	*(PDWORD)0x43AFEF14 = _netvars.get_offset("CBaseAttributableItem", "m_iItemIDLow");
-	*(PDWORD)0x43AFEF28 = _netvars.get_offset("CBaseAttributableItem", "m_nFallbackSeed");
-	*(PDWORD)0x43AFEF2C = _netvars.get_offset("CBaseAttributableItem", "m_flFallbackWear");
-
-	// pHud for FindElement
-	*(PDWORD)0x43AFEFA4 = *(PDWORD)(find_signature("client.dll", "B9 ? ? ? ? 0F 94 C0 0F B6 C0 50 68") + 1);
-
-	// PredictionRandomSeed
-	*(PDWORD)0x43AFEE5C = *(DWORD*)(find_signature("client.dll", "C7 05 ? ? ? ? ? ? ? ? EB ? 8B 47") + 2);
-}
+    uintptr_t predSeed2018 = PatternScanner::FindOrZero("client.dll", "C7 05 ? ? ? ? ? ? ? ? EB ? 8B 47");
+    if (predSeed2018) *(PDWORD)0x43AFEE5C = *(DWORD*)(predSeed2018 + 2);
 #endif
 
-void fix_post_oep_crap()
-{
-	log("fixing render... (original res: " << render->Width << "x" << render->Height << ")")
+    // Call netvar & skins init
+    LOG_INFO("Calling netvar init at 0x34E1D890");
+    try {
+        ((void(*)())(0x34E1D890))();
+    } catch (...) {
+        LOG_ERROR("Exception in netvar init");
+    }
 
-	render->DidCreateFont = false;
-	render->Width = 0;
-	render->Height = 0;
+    LOG_INFO("Refreshing config list at 0x34E2B410");
+    try {
+        ((void(*)())(0x34E2B410))();
+    } catch (...) {
+        LOG_ERROR("Exception in config list refresh");
+    }
 
-	log("fixing xor...");
-	for (auto& xor_addr : xor_patches)
-	{
-		*(PBYTE)xor_addr = 0x75;
-	}
+    // Reset config name
+    memset((void*)0x43AF8B2C, 0, 32);
 
-	while (!(window = FindWindowA("Valve001", nullptr)))
-		Sleep(100);
-
-	// reset skinchanger struct so it does not create weird issues inside skin changer window
-	std::memset(skinchanger_ctx, 0, 216);
-
-	*(PDWORD)0x43B01318 = (DWORD)_netvars.get_prop("CCSPlayer", "m_angEyeAngles[1]"); // m_angEyeAngles[1]
-	*(PDWORD)0x43B01324 = (DWORD)_netvars.get_prop("CSmokeGrenadeProjectile", "m_nSmokeEffectTickBegin"); // m_nSmokeEffectTickBegin
-
-	*(PDWORD)0x43AFE0C4 = (DWORD)_netvars.get_class("CBaseWeaponWorldModel"); // CBaseWeaponWorldModel
-	*(PDWORD)0x43AFE0E0 = (DWORD)_netvars.get_class("CBaseViewModel"); // CBaseViewModel
-
-	MODULEINFO info;
-	GetModuleInformation(GetCurrentProcess(), GetModuleHandleA("client.dll"), &info, 12);
-
-	*(PDWORD)0x43AFF038 = (DWORD)info.lpBaseOfDll + 0x1000; // client.dll base for pattern scanner
-	*(PDWORD)0x43AFF024 = info.SizeOfImage; // client.dll size for pattern scanner
-
-	char* records_mem = new char[0x3234 * 64];
-	*(PDWORD)0x43AF7A84 = (DWORD)records_mem; // allocate lagrecords
-	std::memset(records_mem, 0, 0x3234 * 64);
-
-	*(PDWORD)0x43AFE638 = 0; // UnlockCursor?
-
-	// *(PDWORD)0x43AFF004 = (DWORD)new int; // unknown var, patch rn (Namestealer, Namespam)
-	// *(PCHAR)0x43AFCCB2 = 0; // skin_active cfg
-
-	struct profile_t
-	{
-		int xor_key = 0;
-		int pad;
-		wchar_t config_path[260];
-		int pad2[64];
-	};
-
-	profile_t* profile_ = new profile_t;
-	std::memset(profile_, 0, sizeof(profile_t));
-
-	profile_->xor_key = 0;
-	std::memcpy(profile_->config_path, L"\\??\\C:\\aimware\\", sizeof(L"\\??\\C:\\aimware\\"));
-
-	*(PDWORD)0x43AFF218 = (DWORD)profile_;
-
-	CreateDirectoryA("C:\\aimware\\", 0);
-
-	for (PBYTE byte = (PBYTE)0x34E1DA71; (DWORD)byte < 0x34E1DA82; byte++)
-		*byte = 0x90;
-
-	for (PBYTE byte = (PBYTE)0x34E1DA85; (DWORD)byte < 0x34E1DA8A; byte++)
-		*byte = 0x90;
-
-	for (PBYTE byte = (PBYTE)0x34E1DA8F; (DWORD)byte < 0x34E1DA94; byte++)
-		*byte = 0x90;
-
-	for (PBYTE byte = (PBYTE)0x34E1DA9A; (DWORD)byte < 0x34E1DA9D; byte++)
-		*byte = 0x90;
-
-	for (PBYTE byte = (PBYTE)0x34E1DAA2; (DWORD)byte < 0x34E1DAA5; byte++)
-		*byte = 0x90;
-
-	for (PBYTE byte = (PBYTE)0x34E1DAA8; (DWORD)byte < 0x34E1DAAD; byte++)
-		*byte = 0x90;
-
-#ifdef CSGO2018
-	fix_for_2018();
-#endif
-
-	// call netvar & skins init.
-	((void(*)())(0x34E1D890))();
-
-	// refresh config list
-	((void(*)())(0x34E2B410))();
-
-	// reset config name
-	std::memset((void*)0x43AF8B2C, 0, 32);
+    LOG_SUCCESS("Post-OEP fixes done");
 }
 
-void __cdecl hkPanic()
-{
-	engine_vgui_hook->unhook();
-	client_hook->unhook();
-	client_mode_hook->unhook();
-	prediction_hook->unhook();
-	surface_hook->unhook();
-	trace_hook->unhook();
-	studio_render_hook->unhook();
+void HookNetvar(const char* table, const char* var, uintptr_t original_addr, uintptr_t hook_fn) {
+    auto& state = GlobalState::Instance();
+    RecvProp* prop = nullptr;
+    int offset = state.netvars.GetProp(table, var, &prop);
 
-	unhook_netvars();
+    if (!prop) {
+        LOG_WARN("Netvar %s::%s not found", table, var);
+        return;
+    }
 
-	((RecvProp*)skinchanger_ctx->sequence_prop)->proxy = (recvProxy)skinchanger_ctx->sequence_proxy;
+    state.hooked_netvars.push_back({ (uintptr_t)prop->proxy, (uintptr_t)prop });
 
-	SetWindowLongPtr(window, GWL_WNDPROC, (LONG)orig_wndproc);
-	return;
+    if (original_addr) {
+        *(void**)original_addr = (void*)prop->proxy;
+    }
+
+    prop->proxy = (RecvVarProxyFn)hook_fn;
+    LOG_INFO("Hooked netvar %s::%s offset 0x%X -> 0x%08X", table, var, offset, hook_fn);
 }
 
-void __stdcall hkGenConfigPath(const char* name, wchar_t* out)
-{
-	std::memset(out, 0, sizeof(wchar_t) * 64);
-
-	int pos = strlen(name);
-	for (int i = 0; i < pos; i++)
-		out[i] = (wchar_t)name[i];
+void UnhookNetvars() {
+    auto& state = GlobalState::Instance();
+    for (auto& [original, propAddr] : state.hooked_netvars) {
+        ((RecvProp*)propAddr)->proxy = (RecvVarProxyFn)original;
+    }
+    state.hooked_netvars.clear();
+    LOG_INFO("Netvars unhooked");
 }
 
-void init_aw_hooks()
-{ 
-	// 34E26660 - hkEngineVGUI_Paint | 34E33D60 - hkWndProc
+void __cdecl hkPanic() {
+    LOG_WARN("Panic called - unhooking all");
 
-	DetourFunction((PBYTE)0x34E34E90, (PBYTE)hkGenConfigPath); // visual-only. make cfg filenames readable
-	DetourFunction((PBYTE)0x34E25530, (PBYTE)hkPanic);
+    auto& state = GlobalState::Instance();
+    state.panic = true;
 
-	orig_wndproc = (WNDPROC)SetWindowLongPtr(window, GWL_WNDPROC, (LONG_PTR)((void*)0x34E33D60));
+    if (state.engine_vgui_hook) state.engine_vgui_hook->Unhook();
+    if (state.client_hook) state.client_hook->Unhook();
+    if (state.client_mode_hook) state.client_mode_hook->Unhook();
+    if (state.prediction_hook) state.prediction_hook->Unhook();
+    if (state.surface_hook) state.surface_hook->Unhook();
+    if (state.trace_hook) state.trace_hook->Unhook();
+    if (state.studio_render_hook) state.studio_render_hook->Unhook();
 
-	*(WNDPROC*)(0x43AFF104) = orig_wndproc;
-	*(HWND*)(0x43AFF214) = window;
+    UnhookNetvars();
+
+    if (state.skinchanger_ctx) {
+        ((RecvProp*)state.skinchanger_ctx->sequence_prop)->proxy = (RecvVarProxyFn)state.skinchanger_ctx->sequence_proxy;
+    }
+
+    if (state.window && state.orig_wndproc) {
+        SetWindowLongPtr(state.window, GWL_WNDPROC, (LONG)state.orig_wndproc);
+    }
+
+    LOG_SUCCESS("Panic unhook complete");
+}
+
+void __stdcall hkGenConfigPath(const char* name, wchar_t* out) {
+    // Use improved config system but keep binary compatibility
+    Aimware2016Decompiled::ConfigUIEngine::hkGenConfigPath(name, out);
+}
+
+bool InitializeHooks() {
+    LOG_INFO("Initializing hooks...");
+
+    auto& state = GlobalState::Instance();
+
+    // Detour config path generator to make filenames readable
+    DetourFunction((PBYTE)0x34E34E90, (PBYTE)hkGenConfigPath);
+    DetourFunction((PBYTE)0x34E25530, (PBYTE)hkPanic);
+
+    if (state.window) {
+        state.orig_wndproc = (WNDPROC)SetWindowLongPtr(state.window, GWL_WNDPROC, (LONG_PTR)((void*)0x34E33D60));
+        *(WNDPROC*)(0x43AFF104) = state.orig_wndproc;
+        *(HWND*)(0x43AFF214) = state.window;
+        LOG_INFO("WndProc hooked: original 0x%p", state.orig_wndproc);
+    }
 
 #ifdef USE_DECOMPILED_ENGINE
-	// Bridge hooks using decompiled C++ engine subroutines
-	*(PDWORD)0x43AFE63C = engine_vgui_hook->hook_function((DWORD)&Aimware2016Decompiled::VisualsEngine::hkEngineVGUIPaint, 14); // EngineVGUI::Paint
-	*(PDWORD)0x43AFE630 = client_hook->hook_function(0x34E26330, 36); // CHLClient::FrameStageNotify original
-	*(PDWORD)0x43AFE178 = client_mode_hook->hook_function((DWORD)&Aimware2016Decompiled::AimbotEngine::hkCreateMove, 24); // ClientMode::CreateMove
-	*(PDWORD)0x43AFEE54 = prediction_hook->hook_function(0x34E314B0, 19); // Prediction::RunCommand original
-	*(PDWORD)0x43AFE644 = prediction_hook->hook_function(0x34E26880, 20); // Prediction::SetupMove original
+    LOG_INFO("Using DECOMPILED engine hooks");
 
-	*(PDWORD)0x43AFE634 = surface_hook->hook_function((DWORD)&Aimware2016Decompiled::VisualsEngine::hkLockCursor, 67); // Surface::LockCursor
-	*(PDWORD)0x43AFE17C = studio_render_hook->hook_function((DWORD)&Aimware2016Decompiled::VisualsEngine::hkDrawModel, 29); // StudioRender::DrawModel
+    if (state.engine_vgui_hook) {
+        *(PDWORD)0x43AFE63C = state.engine_vgui_hook->HookFunction((DWORD)&Aimware2016Decompiled::VisualsEngine::hkEngineVGUIPaint, 14);
+    }
+    if (state.client_hook) {
+        *(PDWORD)0x43AFE630 = state.client_hook->HookFunction(0x34E26330, 36);
+        state.client_hook->HookFunction(0x34E268C0, 23);
+    }
+    if (state.client_mode_hook) {
+        *(PDWORD)0x43AFE178 = state.client_mode_hook->HookFunction((DWORD)&Aimware2016Decompiled::AimbotEngine::hkCreateMove, 24);
+    }
+    if (state.prediction_hook) {
+        *(PDWORD)0x43AFEE54 = state.prediction_hook->HookFunction(0x34E314B0, 19);
+        *(PDWORD)0x43AFE644 = state.prediction_hook->HookFunction(0x34E26880, 20);
+        state.prediction_hook->HookFunction(0x34E26500, 14);
+    }
+    if (state.surface_hook) {
+        *(PDWORD)0x43AFE634 = state.surface_hook->HookFunction((DWORD)&Aimware2016Decompiled::VisualsEngine::hkLockCursor, 67);
+    }
+    if (state.studio_render_hook) {
+        *(PDWORD)0x43AFE17C = state.studio_render_hook->HookFunction((DWORD)&Aimware2016Decompiled::VisualsEngine::hkDrawModel, 29);
+    }
 
-	client_hook->hook_function(0x34E268C0, 23); // CHLClient::WriteUserCmdDeltaToBuffer
-	prediction_hook->hook_function(0x34E26500, 14); // Prediction::InPrediction
+    *(PDWORD)0x43AFE0E8 = (DWORD)DetourFunction((PBYTE)PatternScanner::FindOrZero("client.dll", "55 8B EC 83 EC ? 56 8B F1 57 89 75 ? E8 ? ? ? ? 8B CE E8"), (PBYTE)&Aimware2016Decompiled::ResolverEngine::hkOnRenderStart);
 
-	*(PDWORD)0x43AFE0E8 = (DWORD)DetourFunction((PBYTE)find_signature("client.dll", "55 8B EC 83 EC ? 56 8B F1 57 89 75 ? E8 ? ? ? ? 8B CE E8"), (PBYTE)&Aimware2016Decompiled::ResolverEngine::hkOnRenderStart);
+    HookNetvar("CSmokeGrenadeProjectile", "m_nSmokeEffectTickBegin", 0x43B01328, 0x34E24BC0);
+    HookNetvar("CCSPlayer", "m_angEyeAngles[0]", 0, (uintptr_t)&Aimware2016Decompiled::ResolverEngine::OnPitchProxy);
+    HookNetvar("CCSPlayer", "m_angEyeAngles[1]", 0, (uintptr_t)&Aimware2016Decompiled::ResolverEngine::OnYawProxy);
+    HookNetvar("CCSPlayer", "m_flThirdpersonRecoil", 0x43B01304, 0x34E24FC0);
+    HookNetvar("CCSPlayer", "m_flLowerBodyYawTarget", 0x43B01334, (uintptr_t)&Aimware2016Decompiled::ResolverEngine::OnLBYProxy);
+    HookNetvar("CBasePlayer", "m_fFlags", 0x43B01340, 0x34E24F40);
+    HookNetvar("CCSPlayer", "m_flFlashDuration", 0x43B0134C, 0x34E24B90);
 
-	hook_netvar("CSmokeGrenadeProjectile", "m_nSmokeEffectTickBegin", 0x43B01328, 0x34E24BC0);
-
-	hook_netvar("CCSPlayer", "m_angEyeAngles[0]", 0, (uintptr_t)&Aimware2016Decompiled::ResolverEngine::OnPitchProxy);
-	hook_netvar("CCSPlayer", "m_angEyeAngles[1]", 0, (uintptr_t)&Aimware2016Decompiled::ResolverEngine::OnYawProxy);
-	hook_netvar("CCSPlayer", "m_flThirdpersonRecoil", 0x43B01304, 0x34E24FC0);
-	hook_netvar("CCSPlayer", "m_flLowerBodyYawTarget", 0x43B01334, (uintptr_t)&Aimware2016Decompiled::ResolverEngine::OnLBYProxy);
-	hook_netvar("CBasePlayer", "m_fFlags", 0x43B01340, 0x34E24F40);
-	hook_netvar("CCSPlayer", "m_flFlashDuration", 0x43B0134C, 0x34E24B90);
 #else
-	*(PDWORD)0x43AFE63C = engine_vgui_hook->hook_function(0x34E26660, 14); // EngineVGUI::Paint original
-	*(PDWORD)0x43AFE630 = client_hook->hook_function(0x34E26330, 36); // CHLClient::FrameStageNotify original
-	*(PDWORD)0x43AFE178 = client_mode_hook->hook_function(0x34E258A0, 24); // ClientMode::CreateMove original
-	*(PDWORD)0x43AFEE54 = prediction_hook->hook_function(0x34E314B0, 19); // Prediction::RunCommand original
-	*(PDWORD)0x43AFE644 = prediction_hook->hook_function(0x34E26880, 20); // Prediction::SetupMove original
+    LOG_INFO("Using ORIGINAL binary hooks");
 
-	*(PDWORD)0x43AFE634 = surface_hook->hook_function(0x34E26620, 67); // Surface::LockCursor original
-	*(PDWORD)0x43AFE17C = studio_render_hook->hook_function(0x34E25960, 29); // StudioRender::DrawModel original
+    if (state.engine_vgui_hook) *(PDWORD)0x43AFE63C = state.engine_vgui_hook->HookFunction(0x34E26660, 14);
+    if (state.client_hook) {
+        *(PDWORD)0x43AFE630 = state.client_hook->HookFunction(0x34E26330, 36);
+        state.client_hook->HookFunction(0x34E268C0, 23);
+    }
+    if (state.client_mode_hook) *(PDWORD)0x43AFE178 = state.client_mode_hook->HookFunction(0x34E258A0, 24);
+    if (state.prediction_hook) {
+        *(PDWORD)0x43AFEE54 = state.prediction_hook->HookFunction(0x34E314B0, 19);
+        *(PDWORD)0x43AFE644 = state.prediction_hook->HookFunction(0x34E26880, 20);
+        state.prediction_hook->HookFunction(0x34E26500, 14);
+    }
+    if (state.surface_hook) *(PDWORD)0x43AFE634 = state.surface_hook->HookFunction(0x34E26620, 67);
+    if (state.studio_render_hook) *(PDWORD)0x43AFE17C = state.studio_render_hook->HookFunction(0x34E25960, 29);
 
-	client_hook->hook_function(0x34E268C0, 23); // CHLClient::WriteUserCmdDeltaToBuffer, no original needed
-	prediction_hook->hook_function(0x34E26500, 14); // Prediction::InPrediction, no original needed
+    *(PDWORD)0x43AFE0E8 = (DWORD)DetourFunction((PBYTE)PatternScanner::FindOrZero("client.dll", "55 8B EC 83 EC ? 56 8B F1 57 89 75 ? E8 ? ? ? ? 8B CE E8"), (PBYTE)0x34E25040);
 
-	*(PDWORD)0x43AFE0E8 = (DWORD)DetourFunction((PBYTE)find_signature("client.dll", "55 8B EC 83 EC ? 56 8B F1 57 89 75 ? E8 ? ? ? ? 8B CE E8"), (PBYTE)0x34E25040); // CViewRender::OnRenderStart original
-
-	/////////////////////////////////////////////////////
-
-	hook_netvar("CSmokeGrenadeProjectile", "m_nSmokeEffectTickBegin", 0x43B01328, 0x34E24BC0);
-
-	hook_netvar("CCSPlayer", "m_angEyeAngles[0]", 0, 0x34E24BF0);
-	hook_netvar("CCSPlayer", "m_angEyeAngles[1]", 0, 0x34E24D20);
-	hook_netvar("CCSPlayer", "m_flThirdpersonRecoil", 0x43B01304, 0x34E24FC0);
-	hook_netvar("CCSPlayer", "m_flLowerBodyYawTarget", 0x43B01334, 0x34E24EC0);
-	hook_netvar("CBasePlayer", "m_fFlags", 0x43B01340, 0x34E24F40);
-	hook_netvar("CCSPlayer", "m_flFlashDuration", 0x43B0134C, 0x34E24B90);
+    HookNetvar("CSmokeGrenadeProjectile", "m_nSmokeEffectTickBegin", 0x43B01328, 0x34E24BC0);
+    HookNetvar("CCSPlayer", "m_angEyeAngles[0]", 0, 0x34E24BF0);
+    HookNetvar("CCSPlayer", "m_angEyeAngles[1]", 0, 0x34E24D20);
+    HookNetvar("CCSPlayer", "m_flThirdpersonRecoil", 0x43B01304, 0x34E24FC0);
+    HookNetvar("CCSPlayer", "m_flLowerBodyYawTarget", 0x43B01334, 0x34E24EC0);
+    HookNetvar("CBasePlayer", "m_fFlags", 0x43B01340, 0x34E24F40);
+    HookNetvar("CCSPlayer", "m_flFlashDuration", 0x43B0134C, 0x34E24B90);
 #endif
+
+    LOG_SUCCESS("Hooks initialized");
+    return true;
 }
 
-void init_local_interfaces()
-{
-	engine_vgui = get_interface<void>("engine.dll", "VEngineVGui0");
-	engine_vgui_hook = new vmthook(reinterpret_cast<DWORD**>(engine_vgui));
+void Shutdown() {
+    LOG_WARN("Shutting down Aimware...");
 
-	studio_render = get_interface<void>("studiorender.dll", "VStudioRender");
-	studio_render_hook = new vmthook(reinterpret_cast<DWORD**>(studio_render));
+    auto& state = GlobalState::Instance();
+    state.Reset();
+    MemoryManager::Instance().FreeAll();
 
-	// who cares? data retrieved from Firebullets::PostDataUpdate hook doesnt seem to be used anywhere
-	//fire_bullets = *(void**)(find_signature("client.dll", "8B D1 B8 ? ? ? ? 51") + 0x91);
-	//fire_bullets_hook = new vmthook(reinterpret_cast<DWORD**>(fire_bullets));
-
-	client_hook = new vmthook(reinterpret_cast<DWORD**>(client));
-	client_mode_hook = new vmthook(reinterpret_cast<DWORD**>(client_mode));
-	prediction_hook = new vmthook(reinterpret_cast<DWORD**>(prediction));
-	surface_hook = new vmthook(reinterpret_cast<DWORD**>(surface));
-	trace_hook = new vmthook(reinterpret_cast<DWORD**>(trace));
+    LOG_INFO("Shutdown complete");
 }
 
-void init_netvars()
-{
-	_netvars.tables.clear();
+} // namespace Aimware
 
-	auto clientclass = client->GetAllClasses();
-	if (!clientclass)
-		return;
+// ===================== Main Thread =====================
 
-	while (clientclass)
-	{
-		auto recvTable = clientclass->m_pRecvTable;
-		if (recvTable)
-		{
-			_netvars.classes.emplace(std::string(clientclass->m_pNetworkName), clientclass);
-			_netvars.tables.emplace(std::string(clientclass->m_pNetworkName), recvTable);
-		}
+DWORD WINAPI install_thread(PVOID) {
+    Aimware::Logger::Instance().Initialize(true, false);
+    LOG_INFO("=== Aimware 2016 Loader Started ===");
 
-		clientclass = clientclass->m_pNext;
-	}
+    // Wait for serverbrowser.dll - indicates game fully loaded
+    LOG_INFO("Waiting for serverbrowser.dll...");
+    while (!GetModuleHandleA("serverbrowser.dll")) {
+        Sleep(100);
+    }
+    Sleep(500); // Extra wait for all modules
+
+    LOG_INFO("Game modules loaded, initializing...");
+
+    if (!Aimware::InitializeMemoryDumps()) {
+        LOG_ERROR("Failed to initialize memory dumps");
+        return 1;
+    }
+
+    // Initialize global pointers from fixed memory
+    auto& state = GlobalState::Instance();
+    state.render = *(AwRender**)(0x43B01224);
+    state.global_ctx = *(AwGlobals**)(0x43AF7704);
+    state.skinchanger_ctx = *(AwSkinChangerData**)(0x43AF7700);
+
+    LOG_INFO("Fixing imports...");
+    Aimware::FixImports();
+
+    LOG_INFO("Initializing interfaces...");
+    if (!Aimware::InitializeInterfaces()) {
+        LOG_ERROR("Interface initialization failed");
+        // Continue anyway
+    }
+
+    LOG_INFO("Initializing netvars...");
+    if (!Aimware::InitializeNetvars()) {
+        LOG_ERROR("Netvar initialization failed");
+    }
+
+    LOG_INFO("Fixing addresses...");
+    Aimware::FixAddresses();
+
+    LOG_INFO("Fixing convars...");
+    Aimware::FixConvars();
+
+    LOG_INFO("Fixing post-OEP...");
+    Aimware::FixPostOEP();
+
+    LOG_INFO("Initializing decompiled engine...");
+    Aimware2016Decompiled::InitializeDecompiledEngine();
+
+    LOG_INFO("Initializing hooks...");
+    if (!Aimware::InitializeHooks()) {
+        LOG_ERROR("Hook initialization failed");
+        return 1;
+    }
+
+    state.initialized = true;
+    LOG_SUCCESS("=== Aimware 2016 Loaded Successfully ===");
+    LOG_INFO("Press INSERT to open menu (if available)");
+    LOG_INFO("Fixed memory regions: 0x34E10000, 0x43AF0000, 0x76ED0000, 0x7C4A0000");
+    LOG_INFO("Decompiled engine: %s", 
+#ifdef USE_DECOMPILED_ENGINE
+        "ENABLED"
+#else
+        "DISABLED (binary)"
+#endif
+    );
+
+    return 0;
 }
 
-DWORD WINAPI install_thread(PVOID a1)
-{
-	AllocConsole();
-
-	FILE* dum;
-	freopen_s(&dum, "CONOUT$", "w", stdout);
-
-	while (!GetModuleHandleA("serverbrowser.dll"))
-		Sleep(1);
-
-	log("copying dumps...");
-	std::memcpy((void*)0x7C4A0000, b7C4A0000, sizeof(b7C4A0000));
-	std::memcpy((void*)0x76ED0000, b76ED0000, sizeof(b76ED0000));
-
-	std::memcpy((void*)0x43AF0000, b43AF0000, sizeof(b43AF0000));
-	std::memcpy((void*)0x34E10000, b34E10000, sizeof(b34E10000));
-
-	log("getting aimware structs...");
-	init_aw_ptrs();
-
-	log("fixing imports...");
-	fix_imports();
-
-	log("initializing interfaces...");
-	init_interfaces();
-	init_local_interfaces();
-
-	log("initializing netvars...");
-	init_netvars();
-
-	log("fixing addresses...");
-	fix_addresses();
-
-	log("fixing cvars...");
-	fix_cvars();
-
-	log("restoring stuff...");
-	fix_post_oep_crap();
-
-	log("initializing decompiled engine...");
-	Aimware2016Decompiled::InitializeDecompiledEngine();
-
-	log("initializing hooks...");
-	init_aw_hooks();
-
-	log("done!");
-	return EXIT_SUCCESS;
-}
-
-BOOL WINAPI DllMain(void* a1, int reason, void* a2)
-{
-	if (reason == DLL_PROCESS_ATTACH)
-		CreateThread(0, 0, install_thread, 0, 0, 0);
-
-	return TRUE;
+BOOL WINAPI DllMain(void* hinst, int reason, void* reserved) {
+    if (reason == DLL_PROCESS_ATTACH) {
+        DisableThreadLibraryCalls((HMODULE)hinst);
+        CreateThread(0, 0, install_thread, 0, 0, 0);
+    } else if (reason == DLL_PROCESS_DETACH) {
+        if (GlobalState::Instance().initialized && !GlobalState::Instance().panic) {
+            Aimware::Shutdown();
+        }
+    }
+    return TRUE;
 }
